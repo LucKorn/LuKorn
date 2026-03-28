@@ -1,0 +1,18 @@
+{
+  "expo": {
+    "name": "Meus Treinos",
+    "slug": "meutreinoapp",
+    "version": "1.0.1",
+    "orientation": "portrait",
+    "userInterfaceStyle": "automatic",
+    "android": {
+      "package": "com.luciano.meutreino"
+    },
+    "extra": {
+      "eas": {
+        "projectId": "e512f463-1a37-4dbf-b696-050377355dbf"
+      }
+    },
+    "sdkVersion": "50.0.0"
+  }
+}
