@@ -12,7 +12,7 @@
       "backgroundColor": "#0A0A0A"
     },
     "android": {
-      "package": "com.luciano.treinos",
+      "package": "com.luciano.treino",
       "adaptiveIcon": {
         "foregroundImage": "./assets/icon.png",
         "backgroundColor": "#0A0A0A"
@@ -20,7 +20,7 @@
     },
     "extra": {
       "eas": {
-        "projectId": "e512f463-1a37-4dbf-b696-050377355dbf"
+        "projectId":{ "e512f463-1a37-4dbf-b696-050377355dbf"
       }
     }
   }
