@@ -1,4 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
+import * as SplashScreen from 'expo-splash-screen';
+import { useKeepAwake } from 'expo-keep-awake'; // Impede a hibernação
 import { 
   StyleSheet, Text, View, TouchableOpacity, FlatList, 
   TextInput, ScrollView, Modal, Vibration, Dimensions, SafeAreaView 
@@ -7,294 +9,219 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 
 const { width } = Dimensions.get('window');
 
+// Mantém a splash screen visível até o app carregar
+SplashScreen.preventAutoHideAsync();
+
 export default function App() {
-  const [tema, setTema] = useState('dark');
+  // Ativa o recurso para a tela não desligar durante o treino
+  useKeepAwake();
+
+  const [appPronto, setAppPronto] = useState(false);
+  const [tema, setTema] = useState('light');
   const [treinoAtivo, setTreinoAtivo] = useState(null);
+  const [tela, setTela] = useState('menu');
+  const [mesAtual, setMesAtual] = useState(new Date());
+  
+  // Estados principais baseados no seu print
+  const [appTitle, setAppTitle] = useState('TREINO RCHOP');
+  const [tempoDescanso, setTempoDescanso] = useState(180); 
   const [exercicios, setExercicios] = useState({});
   const [historico, setHistorico] = useState([]);
-  const [tela, setTela] = useState('menu');
-  const [tempoDescanso, setTempoDescanso] = useState(60);
-  const [novoTreinoNome, setNovoTreinoNome] = useState('');
-  const [appTitle, setAppTitle] = useState('MEUS TREINOS');
-  const [mesAtual, setMesAtual] = useState(new Date());
 
+  // Estados do Cronômetro
   const [timerAtivo, setTimerAtivo] = useState(false);
   const [segundos, setSegundos] = useState(0);
   const timerRef = useRef(null);
 
+  // Estados de Input
+  const [novoTreinoNome, setNovoTreinoNome] = useState('');
+
   const Cores = {
     bg: tema === 'light' ? '#F2F2F7' : '#0A0A0A',
     card: tema === 'light' ? '#FFFFFF' : '#1C1C1E',
-    headerBorder: tema === 'light' ? '#D1D1D6' : '#2C2C2E',
     texto: tema === 'light' ? '#1C1C1E' : '#FFFFFF',
-    destaque: '#3A506B', 
+    azulDestaque: '#007AFF', // Cor da bordinha lateral
+    danger: '#FF4D4F',
     sub: '#8E8E93',
-    borda: tema === 'light' ? '#D1D1D6' : '#2C2C2E',
-    stepperBg: tema === 'light' ? '#F0F0F0' : '#2C2C2E',
-    danger: '#FF4D4F'
+    botaoAdd: '#3A506B'
   };
 
   useEffect(() => {
-    const load = async () => {
-      try {
-        const d = await AsyncStorage.getItem('@gym_v54_data');
-        const h = await AsyncStorage.getItem('@gym_v54_hist');
-        const t = await AsyncStorage.getItem('@gym_v54_desc');
-        const title = await AsyncStorage.getItem('@gym_v54_title');
-        const savedTheme = await AsyncStorage.getItem('@gym_v54_theme');
-        if (d) setExercicios(JSON.parse(d));
-        if (h) setHistorico(JSON.parse(h));
-        if (t) setTempoDescanso(parseInt(t));
-        if (title) setAppTitle(title);
-        if (savedTheme) setTema(savedTheme);
-      } catch (e) { console.log(e); }
-    };
-    load();
+    loadData();
   }, []);
 
-  const save = async (d, h, t, title, th) => {
-    if (d) await AsyncStorage.setItem('@gym_v54_data', JSON.stringify(d));
-    if (h) await AsyncStorage.setItem('@gym_v54_hist', JSON.stringify(h));
-    if (t) await AsyncStorage.setItem('@gym_v54_desc', t.toString());
-    if (title) await AsyncStorage.setItem('@gym_v54_title', title);
-    if (th) await AsyncStorage.setItem('@gym_v54_theme', th);
+  const loadData = async () => {
+    try {
+      const d = await AsyncStorage.getItem('@gym_v55_data');
+      const h = await AsyncStorage.getItem('@gym_v55_hist');
+      const t = await AsyncStorage.getItem('@gym_v55_desc');
+      if (d) setExercicios(JSON.parse(d));
+      if (h) setHistorico(JSON.parse(h));
+      if (t) setTempoDescanso(parseInt(t));
+    } catch (e) {
+      console.log("Erro ao carregar", e);
+    } finally {
+      setAppPronto(true);
+      await SplashScreen.hideAsync();
+    }
   };
 
-  const rodarTimer = (t) => {
-    setSegundos(t); setTimerAtivo(true);
-    if(timerRef.current) clearInterval(timerRef.current);
-    timerRef.current = setInterval(() => setSegundos(s => {
-      if(s <= 1){ clearInterval(timerRef.current); setTimerAtivo(false); Vibration.vibrate(500); return 0; }
-      return s - 1;
-    }), 1000);
+  const saveData = async (newEx, newHist, newDesc) => {
+    try {
+      await AsyncStorage.setItem('@gym_v55_data', JSON.stringify(newEx));
+      await AsyncStorage.setItem('@gym_v55_hist', JSON.stringify(newHist));
+      await AsyncStorage.setItem('@gym_v55_desc', newDesc.toString());
+    } catch (e) {
+      console.log("Erro ao salvar", e);
+    }
   };
 
-  const finalizarTreino = () => {
-    const listaAtual = exercicios[treinoAtivo];
-    const volume = listaAtual.reduce((a, e) => a + (e.feitas * e.rep * e.carga), 0);
-    const agora = new Date();
-    
-    // 1. REORDENAR EXERCÍCIOS: Quem foi feito vai pro fim
-    const pendentes = listaAtual.filter(e => e.feitas === 0);
-    const concluidos = listaAtual.filter(e => e.feitas > 0).map(e => ({...e, feitas: 0}));
-    const novaListaEx = [...pendentes, ...concluidos];
-
-    const nH = [{ 
-      id: Date.now().toString(), 
-      treino: treinoAtivo, 
-      volume, 
-      dataStr: agora.toLocaleDateString('pt-BR'), 
-      timestamp: agora.getTime() 
-    }, ...historico];
-
-    // 2. REORDENAR MENU: Move o treino para o fim da fila
-    const copiaOriginal = { ...exercicios };
-    const nomesOutrosTreinos = Object.keys(copiaOriginal).filter(nome => nome !== treinoAtivo);
-    
-    const novosEx = {};
-    // Primeiro adiciona os outros treinos
-    nomesOutrosTreinos.forEach(nome => {
-      novosEx[nome] = copiaOriginal[nome];
-    });
-    // Por último, adiciona o treino que acabou de ser feito (já com os exercícios reordenados)
-    novosEx[treinoAtivo] = novaListaEx;
-
-    setHistorico(nH); 
-    setExercicios(novosEx);
-    save(novosEx, nH); 
-    setTela('menu');
-    Vibration.vibrate(200);
+  const adicionarTreino = () => {
+    if (novoTreinoNome.trim() === '') return;
+    const novos = { ...exercicios, [novoTreinoNome]: [] };
+    setExercicios(novos);
+    setNovoTreinoNome('');
+    saveData(novos, historico, tempoDescanso);
   };
 
-  const Stepper = ({ label, val, onMin, onAdd }) => (
-    <View style={{alignItems: 'center', flex: 1}}>
-      <Text style={[styles.stepLabel, {color: Cores.sub}]}>{label}</Text>
-      <View style={[styles.stepRow, {backgroundColor: Cores.stepperBg}]}>
-        <TouchableOpacity onPress={onMin}><Text style={[styles.stepBtn, {color: Cores.texto}]}>-</Text></TouchableOpacity>
-        <Text style={[styles.stepValCard, {color: Cores.texto}]}>{val}</Text>
-        <TouchableOpacity onPress={onAdd}><Text style={[styles.stepBtn, {color: Cores.texto}]}>+</Text></TouchableOpacity>
-      </View>
-    </View>
-  );
+  const excluirTreino = (nome) => {
+    const novos = { ...exercicios };
+    delete novos[nome];
+    setExercicios(novos);
+    saveData(novos, historico, tempoDescanso);
+  };
 
-  if (tela === 'historico') {
-    const meses = ["Janeiro", "Fevereiro", "Março", "Abril", "Maio", "Junho", "Julho", "Agosto", "Setembro", "Outubro", "Novembro", "Dezembro"];
-    const umaSemanaAtras = Date.now() - (7 * 24 * 60 * 60 * 1000);
-    const totalSemana = historico.filter(h => h.timestamp > umaSemanaAtras).reduce((acc, curr) => acc + curr.volume, 0);
-    const filtrado = historico.filter(h => {
-      const d = new Date(h.timestamp || Date.now());
-      return d.getMonth() === mesAtual.getMonth() && d.getFullYear() === mesAtual.getFullYear();
-    });
-    const totalMes = filtrado.reduce((acc, curr) => acc + curr.volume, 0);
+  // Funções do Cronômetro
+  const iniciarTimer = () => {
+    Vibration.vibrate(50);
+    setSegundos(tempoDescanso);
+    setTimerAtivo(true);
+    if (timerRef.current) clearInterval(timerRef.current);
+    timerRef.current = setInterval(() => {
+      setSegundos((prev) => {
+        if (prev <= 1) {
+          clearInterval(timerRef.current);
+          setTimerAtivo(false);
+          Vibration.vibrate([500, 500, 500]);
+          return 0;
+        }
+        return prev - 1;
+      });
+    }, 1000);
+  };
 
-    return (
-      <SafeAreaView style={[styles.container, {backgroundColor: Cores.bg}]}>
-        <View style={styles.header}>
-          <TouchableOpacity onPress={() => setTela('menu')}><Text style={[styles.backLink, {color: Cores.texto}]}>◀</Text></TouchableOpacity>
-          <Text style={[styles.headerTitle, {color: Cores.texto}]}>HISTÓRICO</Text>
-          <TouchableOpacity onPress={() => { setHistorico([]); save(null, []); }}><Text style={{color: Cores.danger, paddingRight: 20, fontWeight: 'bold'}}>LIMPAR</Text></TouchableOpacity>
-        </View>
-        <View style={styles.mesSelector}>
-          <TouchableOpacity onPress={() => { const n = new Date(mesAtual.setMonth(mesAtual.getMonth() - 1)); setMesAtual(new Date(n)); }}><Text style={{color: Cores.destaque, fontSize: 24}}>◀</Text></TouchableOpacity>
-          <Text style={{color: Cores.texto, fontWeight: 'bold', fontSize: 18}}>{meses[mesAtual.getMonth()]} {mesAtual.getFullYear()}</Text>
-          <TouchableOpacity onPress={() => { const n = new Date(mesAtual.setMonth(mesAtual.getMonth() + 1)); setMesAtual(new Date(n)); }}><Text style={{color: Cores.destaque, fontSize: 24}}>▶</Text></TouchableOpacity>
-        </View>
-        <View style={styles.resumoContainer}>
-            <View style={[styles.resumoCard, {backgroundColor: Cores.card}]}><Text style={{color: Cores.sub, fontSize: 10, fontWeight: '900'}}>ESTA SEMANA</Text><Text style={{color: Cores.destaque, fontSize: 16, fontWeight: 'bold'}}>{totalSemana} kg</Text></View>
-            <View style={[styles.resumoCard, {backgroundColor: Cores.card}]}><Text style={{color: Cores.sub, fontSize: 10, fontWeight: '900'}}>TOTAL NO MÊS</Text><Text style={{color: Cores.destaque, fontSize: 16, fontWeight: 'bold'}}>{totalMes} kg</Text></View>
-        </View>
-        <FlatList data={filtrado} contentContainerStyle={{padding: 15}} renderItem={({item}) => (
-          <View style={[styles.menuItem, {backgroundColor: Cores.card, marginBottom: 10}]}>
-            <View><Text style={[styles.menuItemTxt, {color: Cores.texto}]}>{item.treino}</Text><Text style={{color: Cores.sub, fontSize: 12}}>{item.dataStr}</Text></View>
-            <View style={{flexDirection: 'row', alignItems: 'center', gap: 15}}>
-                <Text style={{color: Cores.destaque, fontWeight: 'bold'}}>{item.volume} kg</Text>
-                <TouchableOpacity onPress={() => { const nH = historico.filter(h => h.id !== item.id); setHistorico(nH); save(null, nH); }}><Text style={{fontSize: 18}}>🗑️</Text></TouchableOpacity>
-            </View>
-          </View>
-        )} />
-      </SafeAreaView>
-    );
-  }
-
-  if (tela === 'treino') {
-    return (
-      <SafeAreaView style={[styles.container, {backgroundColor: Cores.bg}]}>
-        <View style={[styles.header, {borderBottomWidth: 1, borderColor: Cores.headerBorder}]}>
-          <TouchableOpacity onPress={() => setTela('menu')}><Text style={[styles.backLink, {color: Cores.texto}]}>◀</Text></TouchableOpacity>
-          <Text style={[styles.headerTitle, {color: Cores.texto}]}>{treinoAtivo}</Text>
-          <TouchableOpacity onPress={() => {
-              const c = {...exercicios}; c[treinoAtivo].push({id: Date.now().toString(), nome: 'Novo', series: 3, rep: 10, carga: 0, feitas: 0});
-              setExercicios(c); save(c);
-          }}><Text style={[styles.addExBtn, {color: Cores.texto}]}>+ EX</Text></TouchableOpacity>
-        </View>
-        <FlatList data={exercicios[treinoAtivo]} contentContainerStyle={{padding: 15, paddingBottom: 100}} renderItem={({item}) => {
-            const concluido = item.feitas >= item.series;
-            const isPrancha = item.nome.toLowerCase().includes('prancha');
-            const updateEx = (k, v) => {
-                const nl = [...exercicios[treinoAtivo]]; const i = nl.findIndex(e => e.id === item.id); nl[i][k] = v;
-                const c = {...exercicios}; c[treinoAtivo] = nl; setExercicios(c);
-            };
-            return (
-              <View style={styles.treinoRow}>
-                <View style={[styles.card, {backgroundColor: Cores.card, opacity: concluido ? 0.4 : 1}]}>
-                  <View style={styles.cardHeader}>
-                    <View style={{flexDirection: 'row', gap: 15, alignItems: 'center'}}>
-                        <TouchableOpacity onPress={() => { const nl = [...exercicios[treinoAtivo]]; const i = nl.findIndex(e => e.id === item.id); if (i > 0) { [nl[i], nl[i-1]] = [nl[i-1], nl[i]]; const c = {...exercicios}; c[treinoAtivo] = nl; setExercicios(c); save(c); }}}><Text style={{color: Cores.sub, fontSize: 22}}>▲</Text></TouchableOpacity>
-                        <TouchableOpacity onPress={() => { const nl = [...exercicios[treinoAtivo]]; const i = nl.findIndex(e => e.id === item.id); if (i < nl.length - 1) { [nl[i], nl[i+1]] = [nl[i+1], nl[i]]; const c = {...exercicios}; c[treinoAtivo] = nl; setExercicios(c); save(c); }}}><Text style={{color: Cores.sub, fontSize: 22}}>▼</Text></TouchableOpacity>
-                        <TouchableOpacity onPress={() => { const c = {...exercicios}; c[treinoAtivo] = c[treinoAtivo].filter(e => e.id !== item.id); setExercicios(c); save(c); }}><Text style={{fontSize: 20, marginLeft: 10}}>🗑️</Text></TouchableOpacity>
-                    </View>
-                    <Text style={{color: Cores.sub, fontSize: 11, fontWeight: 'bold'}}>{item.feitas} / {item.series} SÉRIES</Text>
-                  </View>
-                  <TextInput style={[styles.exName, {color: Cores.texto, borderBottomColor: Cores.borda, borderBottomWidth: 1}]} value={item.nome} onChangeText={(v) => updateEx('nome', v)} />
-                  <View style={styles.controlsRow}>
-                    <Stepper label="SÉRIES" val={item.series} onMin={() => updateEx('series', Math.max(1, item.series-1))} onAdd={() => updateEx('series', item.series+1)} />
-                    <Stepper label={isPrancha ? "SEGS" : "REPS"} val={item.rep} onMin={() => updateEx('rep', Math.max(1, item.rep-1))} onAdd={() => updateEx('rep', isPrancha ? item.rep + 5 : item.rep + 1)} />
-                    <Stepper label="KG" val={item.carga} onMin={() => updateEx('carga', Math.max(0, item.carga-1))} onAdd={() => updateEx('carga', item.carga+1)} />
-                  </View>
-                  <TouchableOpacity 
-                    style={[styles.btnAction, {backgroundColor: Cores.destaque}]} 
-                    onPress={() => {
-                        if (concluido) { updateEx('feitas', 0); return; }
-                        let nl = [...exercicios[treinoAtivo]]; const i = nl.findIndex(e => e.id === item.id);
-                        nl[i].feitas += 1;
-                        if (isPrancha) { rodarTimer(item.rep); } 
-                        else { 
-                            if (nl[i].feitas >= nl[i].series) { Vibration.vibrate([0, 100, 50]); } 
-                            else { rodarTimer(tempoDescanso); }
-                        }
-                        const c = {...exercicios}; c[treinoAtivo] = nl; setExercicios(c); save(c);
-                  }}>
-                    <Text style={styles.btnTxtAction}>{concluido ? 'RESETAR' : (isPrancha ? `INICIAR PRANCHA (${item.rep}s)` : `SÉRIE ${item.feitas + 1}`)}</Text>
-                  </TouchableOpacity>
-                </View>
-              </View>
-            );
-          }} ListFooterComponent={() => <TouchableOpacity style={[styles.btnFinalizar, {backgroundColor: Cores.destaque}]} onPress={finalizarTreino}><Text style={styles.btnTxtFinalizar}>FINALIZAR TREINO</Text></TouchableOpacity>}
-        />
-        <Modal visible={timerAtivo} transparent animationType="fade"><View style={styles.timerOverlay}><View style={[styles.timerBox, {backgroundColor: Cores.card}]}>
-          <Text style={[styles.timerNum, {color: Cores.texto}]}>{segundos}s</Text>
-          <View style={{flexDirection: 'row', gap: 10}}>
-            <TouchableOpacity style={[styles.btnExtra, {backgroundColor: Cores.stepperBg}]} onPress={() => setSegundos(s => s + 30)}><Text style={{color: Cores.texto, fontWeight: 'bold'}}>+30s</Text></TouchableOpacity>
-            <TouchableOpacity style={[styles.btnSkip, {backgroundColor: Cores.danger}]} onPress={() => { clearInterval(timerRef.current); setTimerAtivo(false); }}><Text style={{color: '#FFF', fontWeight: 'bold'}}>PULAR</Text></TouchableOpacity>
-          </View>
-        </View></View></Modal>
-      </SafeAreaView>
-    );
-  }
+  if (!appPronto) return null;
 
   return (
-    <SafeAreaView style={[styles.container, {backgroundColor: Cores.bg}]}>
-      <View style={styles.header}><TextInput style={[styles.headerTitle, {color: Cores.texto}]} value={appTitle} onChangeText={setAppTitle} onEndEditing={() => save(null, null, null, appTitle)} /></View>
-      <ScrollView contentContainerStyle={{padding: 15}}>
-        <TouchableOpacity style={[styles.btnHist, {borderColor: Cores.destaque, borderWidth: 1}]} onPress={() => setTela('historico')}><Text style={{color: Cores.destaque, fontWeight: 'bold'}}>📜 VER HISTÓRICO</Text></TouchableOpacity>
-        <View style={[styles.descansoCard, {backgroundColor: Cores.card}]}>
-            <Text style={[styles.sectionLabel, {color: Cores.sub}]}>DESCANSO PADRÃO</Text>
-            <View style={styles.descansoRow}>
-                <TouchableOpacity onPress={() => { const n = Math.max(10, tempoDescanso-10); setTempoDescanso(n); save(null,null,n); }}><Text style={styles.stepAction}>-</Text></TouchableOpacity>
-                <Text style={[styles.stepVal, {color: Cores.texto}]}>{tempoDescanso}s</Text>
-                <TouchableOpacity onPress={() => { const n = tempoDescanso+10; setTempoDescanso(n); save(null,null,n); }}><Text style={styles.stepAction}>+</Text></TouchableOpacity>
-            </View>
+    <SafeAreaView style={[styles.container, { backgroundColor: Cores.bg }]}>
+      <ScrollView contentContainerStyle={{ padding: 20 }}>
+        
+        <Text style={[styles.headerTitle, { color: Cores.texto }]}>{appTitle}</Text>
+
+        <TouchableOpacity style={styles.btnHistorico}>
+          <Text style={styles.btnHistoricoTexto}>📜 VER HISTÓRICO</Text>
+        </TouchableOpacity>
+
+        <View style={[styles.stepperContainer, { backgroundColor: Cores.card }]}>
+          <Text style={styles.stepperLabel}>DESCANSO PADRÃO</Text>
+          <View style={styles.stepperControls}>
+            <TouchableOpacity onPress={() => setTempoDescanso(prev => Math.max(10, prev - 10))}>
+              <Text style={styles.stepperBtn}>-</Text>
+            </TouchableOpacity>
+            <Text style={[styles.stepperValue, { color: Cores.texto }]}>{tempoDescanso}s</Text>
+            <TouchableOpacity onPress={() => setTempoDescanso(prev => prev + 10)}>
+              <Text style={styles.stepperBtn}>+</Text>
+            </TouchableOpacity>
+          </View>
         </View>
-        {Object.keys(exercicios).map((nome) => (
-          <View key={nome} style={[styles.menuItem, {backgroundColor: Cores.card}]}>
-            <View style={styles.menuOrderBtns}>
-                <TouchableOpacity onPress={() => { const keys = Object.keys(exercicios); const i = keys.indexOf(nome); if (i > 0) { [keys[i], keys[i-1]] = [keys[i-1], keys[i]]; const obj = {}; keys.forEach(k => obj[k] = exercicios[k]); setExercicios(obj); save(obj); }}}><Text style={{color: Cores.sub, fontSize: 18}}>▲</Text></TouchableOpacity>
-                <TouchableOpacity onPress={() => { const keys = Object.keys(exercicios); const i = keys.indexOf(nome); if (i < keys.length - 1) { [keys[i], keys[i+1]] = [keys[i+1], keys[i]]; const obj = {}; keys.forEach(k => obj[k] = exercicios[k]); setExercicios(obj); save(obj); }}}><Text style={{color: Cores.sub, fontSize: 18}}>▼</Text></TouchableOpacity>
-            </View>
-            <TextInput style={[styles.menuItemTxt, {color: Cores.texto}]} defaultValue={nome} onEndEditing={(e) => { const nN = e.nativeEvent.text; if (!nN || nN === nome) return; const c = {...exercicios}; c[nN] = c[nome]; delete c[nome]; setExercicios(c); save(c); }} />
-            <View style={styles.menuActionBtns}>
-                <TouchableOpacity onPress={() => { setTreinoAtivo(nome); setTela('treino'); }} style={[styles.btnGo, {backgroundColor: Cores.destaque}]}><Text style={{color: '#FFF', fontSize: 12}}>▶</Text></TouchableOpacity>
-                <TouchableOpacity onPress={() => { const c = {...exercicios}; delete c[nome]; setExercicios(c); save(c); }}><Text style={{fontSize: 18}}>🗑️</Text></TouchableOpacity>
+
+        {Object.keys(exercicios).map((item, index) => (
+          <View key={index} style={[styles.cardTreino, { backgroundColor: Cores.card, borderLeftColor: Cores.azulDestaque }]}>
+            <Text style={[styles.treinoNome, { color: Cores.texto }]}>{item}</Text>
+            <View style={styles.cardActions}>
+              <TouchableOpacity onPress={iniciarTimer} style={styles.btnPlay}>
+                <Text style={{ fontSize: 20 }}>▶️</Text>
+              </TouchableOpacity>
+              <TouchableOpacity onPress={() => excluirTreino(item)}>
+                <Text style={{ fontSize: 20 }}>🗑️</Text>
+              </TouchableOpacity>
             </View>
           </View>
         ))}
-        <TextInput style={[styles.inputMenu, {backgroundColor: Cores.card, color: Cores.texto, marginTop: 10}]} placeholder="Novo treino..." placeholderTextColor={Cores.sub} value={novoTreinoNome} onChangeText={setNovoTreinoNome} />
-        <TouchableOpacity style={[styles.btnMenu, {backgroundColor: Cores.destaque}]} onPress={() => { if(!novoTreinoNome) return; const nE = {...exercicios, [novoTreinoNome]: []}; setExercicios(nE); setNovoTreinoNome(''); save(nE); }}><Text style={{color: '#FFF', fontWeight: 'bold'}}>+ ADICIONAR TREINO</Text></TouchableOpacity>
-        <TouchableOpacity style={styles.themeBtn} onPress={() => { const nt = tema === 'light' ? 'dark' : 'light'; setTema(nt); save(null, null, null, null, nt); }}><Text style={{color: Cores.sub, fontWeight: 'bold'}}>ALTERNAR TEMA ☀️/🌙</Text></TouchableOpacity>
+
+        <TextInput
+          style={[styles.input, { backgroundColor: Cores.card, color: Cores.texto }]}
+          placeholder="Novo treino..."
+          placeholderTextColor={Cores.sub}
+          value={novoTreinoNome}
+          onChangeText={setNovoTreinoNome}
+        />
+
+        <TouchableOpacity style={[styles.btnAdd, { backgroundColor: Cores.botaoAdd }]} onPress={adicionarTreino}>
+          <Text style={styles.btnAddTexto}>+ ADICIONAR TREINO</Text>
+        </TouchableOpacity>
+
+        <TouchableOpacity 
+          style={{ marginTop: 30, alignItems: 'center' }}
+          onPress={() => setTema(tema === 'light' ? 'dark' : 'light')}
+        >
+          <Text style={{ color: Cores.sub }}>ALTERNAR TEMA ☀️/🌙</Text>
+        </TouchableOpacity>
+
       </ScrollView>
+
+      {/* Modal do Cronômetro */}
+      <Modal visible={timerAtivo} transparent animationType="fade">
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalContent}>
+            <Text style={styles.timerTexto}>{segundos}s</Text>
+            <Text style={styles.timerSub}>Descansando...</Text>
+            <TouchableOpacity 
+              style={styles.btnFecharTimer} 
+              onPress={() => { setTimerAtivo(false); clearInterval(timerRef.current); }}
+            >
+              <Text style={{ color: '#FFF', fontWeight: 'bold' }}>PARAR</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </Modal>
     </SafeAreaView>
   );
 }
 
 const styles = StyleSheet.create({
   container: { flex: 1 },
-  header: { paddingTop: 60, paddingBottom: 20, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
-  headerTitle: { fontSize: 30, fontWeight: '900', textAlign: 'center', flex: 1 },
-  backLink: { paddingHorizontal: 20, fontSize: 24, fontWeight: 'bold' },
-  addExBtn: { paddingHorizontal: 20, fontWeight: 'bold' },
-  treinoRow: { marginBottom: 15 },
-  card: { borderRadius: 15, padding: 18, elevation: 3 },
-  cardHeader: { flexDirection: 'row', justifyContent: 'space-between', marginBottom: 15, alignItems: 'center' },
-  exName: { fontSize: 16, fontWeight: 'bold', paddingBottom: 6, marginBottom: 15 },
-  controlsRow: { flexDirection: 'row', justifyContent: 'space-between', gap: 10, marginBottom: 18, width: '100%' },
-  stepLabel: { fontSize: 9, fontWeight: '900', marginBottom: 4 },
-  stepRow: { flexDirection: 'row', alignItems: 'center', borderRadius: 8, flex: 1 },
-  stepBtn: { fontSize: 20, paddingHorizontal: 12, fontWeight: 'bold' },
-  stepValCard: { fontSize: 14, fontWeight: 'bold', flex: 1, textAlign: 'center' },
-  btnAction: { padding: 16, borderRadius: 12, alignItems: 'center' },
-  btnTxtAction: { color: '#FFF', fontWeight: 'bold' },
-  btnFinalizar: { padding: 20, borderRadius: 15, alignItems: 'center', marginBottom: 40 },
-  btnTxtFinalizar: { color: '#FFF', fontWeight: '900' },
-  menuItem: { padding: 12, borderRadius: 15, flexDirection: 'row', alignItems: 'center', marginBottom: 10 },
-  menuOrderBtns: { flexDirection: 'column', gap: 4, marginRight: 8 },
-  menuItemTxt: { fontSize: 14, fontWeight: 'bold', flex: 1, marginRight: 8 },
-  menuActionBtns: { flexDirection: 'row', alignItems: 'center', gap: 12 },
-  btnGo: { width: 34, height: 34, borderRadius: 17, justifyContent: 'center', alignItems: 'center' },
-  btnHist: { padding: 14, borderRadius: 12, alignItems: 'center', marginBottom: 8 },
-  resumoContainer: { flexDirection: 'row', gap: 10, paddingHorizontal: 15, marginBottom: 10 },
-  resumoCard: { flex: 1, padding: 15, borderRadius: 12, alignItems: 'center', borderWidth: 1, borderColor: '#3A506B20' },
-  mesSelector: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingHorizontal: 30, paddingVertical: 15 },
-  descansoCard: { padding: 8, borderRadius: 15, alignItems: 'center', marginBottom: 20 },
-  descansoRow: { flexDirection: 'row', alignItems: 'center', gap: 25 },
-  stepAction: { fontSize: 35, color: '#3A506B', paddingHorizontal: 10 },
-  stepVal: { fontSize: 26, fontWeight: 'bold' },
-  sectionLabel: { fontSize: 11, fontWeight: '900' },
-  inputMenu: { padding: 15, borderRadius: 12 },
-  btnMenu: { padding: 16, borderRadius: 12, alignItems: 'center' },
-  themeBtn: { padding: 25, alignItems: 'center' },
-  timerOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.92)', justifyContent: 'center', alignItems: 'center' },
-  timerBox: { padding: 40, borderRadius: 25, alignItems: 'center', width: width * 0.8 },
-  timerNum: { fontSize: 80, fontWeight: 'bold', marginBottom: 25 },
-  btnExtra: { padding: 15, borderRadius: 12, flex: 1, alignItems: 'center' },
-  btnSkip: { padding: 15, borderRadius: 12, flex: 1, alignItems: 'center' }
+  headerTitle: { fontSize: 28, fontWeight: '900', textAlign: 'center', marginVertical: 30, letterSpacing: 1 },
+  btnHistorico: { backgroundColor: '#E9ECF2', padding: 15, borderRadius: 12, alignItems: 'center', marginBottom: 20 },
+  btnHistoricoTexto: { color: '#3A506B', fontWeight: 'bold', fontSize: 16 },
+  stepperContainer: { padding: 15, borderRadius: 15, alignItems: 'center', marginBottom: 25 },
+  stepperLabel: { fontSize: 12, color: '#8E8E93', fontWeight: 'bold', marginBottom: 5 },
+  stepperControls: { flexDirection: 'row', alignItems: 'center' },
+  stepperBtn: { fontSize: 35, color: '#3A506B', paddingHorizontal: 25 },
+  stepperValue: { fontSize: 32, fontWeight: '800', minWidth: 100, textAlign: 'center' },
+  cardTreino: { 
+    flexDirection: 'row', 
+    justifyContent: 'space-between', 
+    alignItems: 'center', 
+    padding: 20, 
+    borderRadius: 12, 
+    marginBottom: 15,
+    borderLeftWidth: 8, // Bordinha azul lateral
+    elevation: 3,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+  },
+  treinoNome: { fontSize: 18, fontWeight: '600', flex: 1 },
+  cardActions: { flexDirection: 'row', alignItems: 'center' },
+  btnPlay: { marginRight: 20, padding: 5 },
+  input: { padding: 15, borderRadius: 12, fontSize: 16, marginBottom: 15, marginTop: 10 },
+  btnAdd: { padding: 18, borderRadius: 12, alignItems: 'center' },
+  btnAddTexto: { color: '#FFF', fontWeight: 'bold', fontSize: 16 },
+  modalOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.85)', justifyContent: 'center', alignItems: 'center' },
+  modalContent: { alignItems: 'center' },
+  timerTexto: { fontSize: 100, fontWeight: '900', color: '#FFF' },
+  timerSub: { fontSize: 20, color: '#007AFF', fontWeight: 'bold', marginTop: -10, marginBottom: 40 },
+  btnFecharTimer: { backgroundColor: '#FF4D4F', paddingHorizontal: 40, paddingVertical: 15, borderRadius: 30 }
 });
