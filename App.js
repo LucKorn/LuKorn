@@ -37,7 +37,7 @@ export default function App() {
     bg: tema === 'light' ? '#F2F2F7' : '#0A0A0A',
     card: tema === 'light' ? '#FFFFFF' : '#1C1C1E',
     texto: tema === 'light' ? '#1C1C1E' : '#FFFFFF',
-    destaque: '#3A506B', // Seu azul padrão
+    destaque: '#3A506B', 
     sub: '#8E8E93',
     stepperBg: tema === 'light' ? '#F0F0F0' : '#2C2C2E',
     danger: '#FF4D4F'
@@ -92,19 +92,24 @@ export default function App() {
     const listaAtual = exercicios[treinoAtivo];
     const volume = listaAtual.reduce((a, e) => a + (e.feitas * e.rep * e.carga), 0);
     const agora = new Date();
-    
     const pendentes = listaAtual.filter(e => e.feitas === 0);
     const concluidos = listaAtual.filter(e => e.feitas > 0).map(e => ({...e, feitas: 0}));
     const novaListaEx = [...pendentes, ...concluidos];
-    
     const nH = [{ id: Date.now().toString(), treino: treinoAtivo, volume, dataStr: agora.toLocaleDateString('pt-BR'), timestamp: agora.getTime() }, ...historico];
     
-    // Lógica da Fila
     const { [treinoAtivo]: _, ...restante } = exercicios;
     const nE = { ...restante, [treinoAtivo]: novaListaEx };
 
     setHistorico(nH); setExercicios(nE); save(nE, nH); setTela('menu');
     Vibration.vibrate(200);
+  };
+
+  // NOVA FUNÇÃO: Remover item específico do histórico
+  const removerItemHistorico = (id) => {
+    const novoH = historico.filter(h => h.id !== id);
+    setHistorico(novoH);
+    save(null, novoH);
+    Vibration.vibrate(50);
   };
 
   const Stepper = ({ label, val, onMin, onAdd }) => (
@@ -133,7 +138,7 @@ export default function App() {
         <View style={styles.header}>
           <TouchableOpacity onPress={() => setTela('menu')}><Text style={[styles.backLink, {color: Cores.texto}]}>◀</Text></TouchableOpacity>
           <Text style={[styles.headerTitle, {color: Cores.texto}]}>HISTÓRICO</Text>
-          <TouchableOpacity onPress={() => { setHistorico([]); save(null, []); }}><Text style={{color: Cores.danger, paddingRight: 20}}>LIMPAR</Text></TouchableOpacity>
+          <TouchableOpacity onPress={() => { setHistorico([]); save(null, []); }}><Text style={{color: Cores.danger, paddingRight: 20, fontWeight:'bold'}}>LIMPAR TUDO</Text></TouchableOpacity>
         </View>
         <View style={styles.mesSelector}>
           <TouchableOpacity onPress={() => setMesAtual(new Date(mesAtual.setMonth(mesAtual.getMonth()-1)))}><Text style={{color: Cores.destaque, fontSize: 24}}>◀</Text></TouchableOpacity>
@@ -146,8 +151,14 @@ export default function App() {
         </View>
         <FlatList data={filtrado} contentContainerStyle={{padding: 15}} renderItem={({item}) => (
           <View style={[styles.menuItem, {backgroundColor: Cores.card}]}>
-            <View style={{flex: 1}}><Text style={{color: Cores.texto, fontWeight: 'bold'}}>{item.treino}</Text><Text style={{color: Cores.sub, fontSize: 12}}>{item.dataStr}</Text></View>
-            <Text style={{color: Cores.destaque, fontWeight: 'bold'}}>{item.volume} kg</Text>
+            <View style={{flex: 1}}>
+                <Text style={{color: Cores.texto, fontWeight: 'bold'}}>{item.treino}</Text>
+                <Text style={{color: Cores.sub, fontSize: 12}}>{item.dataStr}</Text>
+            </View>
+            <Text style={{color: Cores.destaque, fontWeight: 'bold', marginRight: 10}}>{item.volume} kg</Text>
+            <TouchableOpacity onPress={() => removerItemHistorico(item.id)}>
+                <Text style={{fontSize: 20}}>🗑️</Text>
+            </TouchableOpacity>
           </View>
         )} />
       </SafeAreaView>
@@ -225,11 +236,11 @@ export default function App() {
         <TouchableOpacity style={[styles.btnHist, {borderColor: Cores.destaque, borderWidth: 1}]} onPress={() => setTela('historico')}><Text style={{color: Cores.destaque, fontWeight: 'bold'}}>📜 VER HISTÓRICO</Text></TouchableOpacity>
         <View style={[styles.descansoCard, {backgroundColor: Cores.card}]}>
             <Text style={{color: Cores.sub, fontSize: 10, fontWeight: 'bold'}}>DESCANSO ENTRE SÉRIES (REPS)</Text>
-            <View style={{flexDirection: 'row', alignItems: 'center', gap: 20}}>
+            <div style={{flexDirection: 'row', alignItems: 'center', gap: 20}}>
                 <TouchableOpacity onPress={() => { const n = Math.max(10, tempoDescanso-10); setTempoDescanso(n); save(null,null,n); }}><Text style={[styles.stepAction, {color: Cores.destaque}]}>-</Text></TouchableOpacity>
                 <Text style={[styles.stepVal, {color: Cores.texto}]}>{tempoDescanso}s</Text>
                 <TouchableOpacity onPress={() => { const n = tempoDescanso+10; setTempoDescanso(n); save(null,null,n); }}><Text style={[styles.stepAction, {color: Cores.destaque}]}>+</Text></TouchableOpacity>
-            </View>
+            </div>
         </View>
         {Object.keys(exercicios).map((nome) => (
           <View key={nome} style={[styles.menuItem, {backgroundColor: Cores.card}]}>
@@ -279,3 +290,4 @@ const styles = StyleSheet.create({
   timerNum: { fontSize: 60, fontWeight: 'bold', marginBottom: 20 },
   btnSkip: { padding: 10, borderRadius: 10, width: 100, alignItems: 'center' }
 });
+      
