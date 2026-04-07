@@ -30,18 +30,17 @@ export default function App() {
 
   const [timerAtivo, setTimerAtivo] = useState(false);
   const [segundos, setSegundos] = useState(0);
-  const [tipoTimer, setTipoTimer] = useState('descanso'); // 'descanso' ou 'execucao'
+  const [tipoTimer, setTipoTimer] = useState('descanso'); 
   const timerRef = useRef(null);
 
   const Cores = {
     bg: tema === 'light' ? '#F2F2F7' : '#0A0A0A',
     card: tema === 'light' ? '#FFFFFF' : '#1C1C1E',
     texto: tema === 'light' ? '#1C1C1E' : '#FFFFFF',
-    destaque: '#3A506B', 
+    destaque: '#3A506B', // Seu azul padrão
     sub: '#8E8E93',
     stepperBg: tema === 'light' ? '#F0F0F0' : '#2C2C2E',
-    danger: '#FF4D4F',
-    success: '#4CD964'
+    danger: '#FF4D4F'
   };
 
   useEffect(() => {
@@ -93,11 +92,14 @@ export default function App() {
     const listaAtual = exercicios[treinoAtivo];
     const volume = listaAtual.reduce((a, e) => a + (e.feitas * e.rep * e.carga), 0);
     const agora = new Date();
+    
     const pendentes = listaAtual.filter(e => e.feitas === 0);
     const concluidos = listaAtual.filter(e => e.feitas > 0).map(e => ({...e, feitas: 0}));
     const novaListaEx = [...pendentes, ...concluidos];
+    
     const nH = [{ id: Date.now().toString(), treino: treinoAtivo, volume, dataStr: agora.toLocaleDateString('pt-BR'), timestamp: agora.getTime() }, ...historico];
     
+    // Lógica da Fila
     const { [treinoAtivo]: _, ...restante } = exercicios;
     const nE = { ...restante, [treinoAtivo]: novaListaEx };
 
@@ -179,15 +181,13 @@ export default function App() {
                   <Stepper label="KG" val={item.carga} onMin={() => updateEx('carga', Math.max(0, item.carga-1))} onAdd={() => updateEx('carga', item.carga+1)} />
                 </View>
                 <TouchableOpacity 
-                  style={[styles.btnAction, {backgroundColor: isTempo ? Cores.success : Cores.destaque}]} 
+                  style={[styles.btnAction, {backgroundColor: Cores.destaque}]} 
                   onPress={() => {
                     if (concluido) return updateEx('feitas', 0);
                     if (isTempo) {
-                        // Se for tempo, dispara o cronômetro com o valor de 'rep' (segundos)
                         rodarTimer(item.rep, 'execucao');
                         updateEx('feitas', item.feitas + 1);
                     } else {
-                        // Se for repetições, marca a série e dispara o descanso padrão
                         updateEx('feitas', item.feitas + 1);
                         rodarTimer(tempoDescanso, 'descanso');
                     }
@@ -207,7 +207,7 @@ export default function App() {
               <Text style={{color: Cores.sub, fontWeight: 'bold', marginBottom: 10}}>
                   {tipoTimer === 'execucao' ? 'EXECUTANDO...' : 'DESCANSO'}
               </Text>
-              <Text style={[styles.timerNum, {color: tipoTimer === 'execucao' ? Cores.success : Cores.texto}]}>{segundos}s</Text>
+              <Text style={[styles.timerNum, {color: Cores.texto}]}>{segundos}s</Text>
               <TouchableOpacity style={[styles.btnSkip, {backgroundColor: Cores.danger}]} onPress={() => { clearInterval(timerRef.current); setTimerAtivo(false); }}>
                   <Text style={{color: '#FFF', fontWeight: 'bold'}}>PULAR</Text>
               </TouchableOpacity>
@@ -279,4 +279,3 @@ const styles = StyleSheet.create({
   timerNum: { fontSize: 60, fontWeight: 'bold', marginBottom: 20 },
   btnSkip: { padding: 10, borderRadius: 10, width: 100, alignItems: 'center' }
 });
-      
