@@ -111,6 +111,19 @@ export default function App() {
     Vibration.vibrate(50);
   };
 
+  const moverExercicio = (direcao, id) => {
+    const lista = [...exercicios[treinoAtivo]];
+    const index = lista.findIndex(e => e.id === id);
+    if (direcao === 'up' && index > 0) {
+      [lista[index], lista[index - 1]] = [lista[index - 1], lista[index]];
+    } else if (direcao === 'down' && index < lista.length - 1) {
+      [lista[index], lista[index + 1]] = [lista[index + 1], lista[index]];
+    }
+    const novosEx = { ...exercicios, [treinoAtivo]: lista };
+    setExercicios(novosEx);
+    save(novosEx);
+  };
+
   const Stepper = ({ label, val, onMin, onAdd }) => (
     <View style={{alignItems: 'center', flex: 1}}>
       <Text style={[styles.stepLabel, {color: Cores.sub}]}>{label}</Text>
@@ -137,7 +150,7 @@ export default function App() {
         <View style={styles.header}>
           <TouchableOpacity onPress={() => setTela('menu')}><Text style={[styles.backLink, {color: Cores.texto}]}>◀</Text></TouchableOpacity>
           <Text style={[styles.headerTitle, {color: Cores.texto}]}>HISTÓRICO</Text>
-          <TouchableOpacity onPress={() => { setHistorico([]); save(null, []); }}><Text style={{color: Cores.danger, paddingRight: 20, fontWeight:'bold'}}>LIMPAR TUDO</Text></TouchableOpacity>
+          <TouchableOpacity onPress={() => { setHistorico([]); save(null, []); }}><Text style={{color: Cores.danger, paddingRight: 20, fontWeight:'bold'}}>LIMPAR</Text></TouchableOpacity>
         </View>
         <View style={styles.mesSelector}>
           <TouchableOpacity onPress={() => setMesAtual(new Date(mesAtual.setMonth(mesAtual.getMonth()-1)))}><Text style={{color: Cores.destaque, fontSize: 24}}>◀</Text></TouchableOpacity>
@@ -165,6 +178,7 @@ export default function App() {
   }
 
   if (tela === 'treino') {
+    const lista = exercicios[treinoAtivo] || [];
     return (
       <SafeAreaView style={[styles.container, {backgroundColor: Cores.bg}]}>
         <View style={styles.header}>
@@ -175,7 +189,7 @@ export default function App() {
               setExercicios(c); save(c);
           }}><Text style={[styles.addExBtn, {color: Cores.texto}]}>+ EX</Text></TouchableOpacity>
         </View>
-        <FlatList data={exercicios[treinoAtivo]} contentContainerStyle={{padding: 15}} renderItem={({item}) => {
+        <FlatList data={lista} contentContainerStyle={{padding: 15}} renderItem={({item, index}) => {
             const concluido = item.feitas >= item.series;
             const isTempo = item.nome.toLowerCase().includes('prancha') || item.nome.toLowerCase().includes('seg');
             const updateEx = (k, v) => {
@@ -184,7 +198,17 @@ export default function App() {
             };
             return (
               <View style={[styles.card, {backgroundColor: Cores.card, opacity: concluido ? 0.5 : 1, marginBottom: 15}]}>
-                <TextInput style={[styles.exName, {color: Cores.texto}]} value={item.nome} onChangeText={(v) => updateEx('nome', v)} />
+                <View style={{flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between'}}>
+                    <TextInput style={[styles.exName, {color: Cores.texto, flex: 1}]} value={item.nome} onChangeText={(v) => updateEx('nome', v)} />
+                    <View style={{flexDirection: 'row', gap: 15}}>
+                        {index > 0 && <TouchableOpacity onPress={() => moverExercicio('up', item.id)}><Text style={{color: Cores.destaque, fontSize: 18}}>▲</Text></TouchableOpacity>}
+                        {index < lista.length - 1 && <TouchableOpacity onPress={() => moverExercicio('down', item.id)}><Text style={{color: Cores.destaque, fontSize: 18}}>▼</Text></TouchableOpacity>}
+                        <TouchableOpacity onPress={() => {
+                            const nl = exercicios[treinoAtivo].filter(e => e.id !== item.id);
+                            const c = {...exercicios, [treinoAtivo]: nl}; setExercicios(c); save(c);
+                        }}><Text style={{fontSize: 18}}>🗑️</Text></TouchableOpacity>
+                    </View>
+                </View>
                 <View style={styles.controlsRow}>
                   <Stepper label="SÉRIES" val={item.series} onMin={() => updateEx('series', Math.max(1, item.series-1))} onAdd={() => updateEx('series', item.series+1)} />
                   <Stepper label={isTempo ? "SEG" : "REPS"} val={item.rep} onMin={() => updateEx('rep', Math.max(1, item.rep-1))} onAdd={() => updateEx('rep', item.rep+1)} />
@@ -289,3 +313,4 @@ const styles = StyleSheet.create({
   timerNum: { fontSize: 60, fontWeight: 'bold', marginBottom: 20 },
   btnSkip: { padding: 10, borderRadius: 10, width: 100, alignItems: 'center' }
 });
+                                     
