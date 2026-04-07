@@ -30,18 +30,18 @@ export default function App() {
 
   const [timerAtivo, setTimerAtivo] = useState(false);
   const [segundos, setSegundos] = useState(0);
+  const [tipoTimer, setTipoTimer] = useState('descanso'); // 'descanso' ou 'execucao'
   const timerRef = useRef(null);
 
   const Cores = {
     bg: tema === 'light' ? '#F2F2F7' : '#0A0A0A',
     card: tema === 'light' ? '#FFFFFF' : '#1C1C1E',
-    headerBorder: tema === 'light' ? '#D1D1D6' : '#2C2C2E',
     texto: tema === 'light' ? '#1C1C1E' : '#FFFFFF',
     destaque: '#3A506B', 
     sub: '#8E8E93',
-    borda: tema === 'light' ? '#D1D1D6' : '#2C2C2E',
     stepperBg: tema === 'light' ? '#F0F0F0' : '#2C2C2E',
-    danger: '#FF4D4F'
+    danger: '#FF4D4F',
+    success: '#4CD964'
   };
 
   useEffect(() => {
@@ -57,9 +57,7 @@ export default function App() {
         if (t) setTempoDescanso(parseInt(t));
         if (title) setAppTitle(title);
         if (savedTheme) setTema(savedTheme);
-      } catch (e) { 
-        console.log(e); 
-      } finally {
+      } catch (e) { console.log(e); } finally {
         setAppPronto(true);
         await SplashScreen.hideAsync();
       }
@@ -75,11 +73,18 @@ export default function App() {
     if (th) await AsyncStorage.setItem('@gym_v54_theme', th);
   };
 
-  const rodarTimer = (t) => {
-    setSegundos(t); setTimerAtivo(true);
+  const rodarTimer = (t, tipo = 'descanso') => {
+    setTipoTimer(tipo);
+    setSegundos(t); 
+    setTimerAtivo(true);
     if(timerRef.current) clearInterval(timerRef.current);
     timerRef.current = setInterval(() => setSegundos(s => {
-      if(s <= 1){ clearInterval(timerRef.current); setTimerAtivo(false); Vibration.vibrate(500); return 0; }
+      if(s <= 1){ 
+        clearInterval(timerRef.current); 
+        setTimerAtivo(false); 
+        Vibration.vibrate([0, 500, 200, 500]); 
+        return 0; 
+      }
       return s - 1;
     }), 1000);
   };
@@ -92,7 +97,10 @@ export default function App() {
     const concluidos = listaAtual.filter(e => e.feitas > 0).map(e => ({...e, feitas: 0}));
     const novaListaEx = [...pendentes, ...concluidos];
     const nH = [{ id: Date.now().toString(), treino: treinoAtivo, volume, dataStr: agora.toLocaleDateString('pt-BR'), timestamp: agora.getTime() }, ...historico];
-    const nE = {...exercicios, [treinoAtivo]: novaListaEx};
+    
+    const { [treinoAtivo]: _, ...restante } = exercicios;
+    const nE = { ...restante, [treinoAtivo]: novaListaEx };
+
     setHistorico(nH); setExercicios(nE); save(nE, nH); setTela('menu');
     Vibration.vibrate(200);
   };
@@ -116,6 +124,8 @@ export default function App() {
       const d = new Date(h.timestamp);
       return d.getMonth() === mesAtual.getMonth() && d.getFullYear() === mesAtual.getFullYear();
     });
+    const totalMensal = filtrado.reduce((acc, item) => acc + item.volume, 0);
+
     return (
       <SafeAreaView style={[styles.container, {backgroundColor: Cores.bg}]}>
         <View style={styles.header}>
@@ -124,9 +134,13 @@ export default function App() {
           <TouchableOpacity onPress={() => { setHistorico([]); save(null, []); }}><Text style={{color: Cores.danger, paddingRight: 20}}>LIMPAR</Text></TouchableOpacity>
         </View>
         <View style={styles.mesSelector}>
-          <TouchableOpacity onPress={() => setMesAtual(new Date(mesAtual.setMonth(mesAtual.getMonth()-1)))}><Text style={{color: Cores.destaque}}>◀</Text></TouchableOpacity>
-          <Text style={{color: Cores.texto}}>{meses[mesAtual.getMonth()]} {mesAtual.getFullYear()}</Text>
-          <TouchableOpacity onPress={() => setMesAtual(new Date(mesAtual.setMonth(mesAtual.getMonth()+1)))}><Text style={{color: Cores.destaque}}>▶</Text></TouchableOpacity>
+          <TouchableOpacity onPress={() => setMesAtual(new Date(mesAtual.setMonth(mesAtual.getMonth()-1)))}><Text style={{color: Cores.destaque, fontSize: 24}}>◀</Text></TouchableOpacity>
+          <Text style={{color: Cores.texto, fontWeight: 'bold', fontSize: 18}}>{meses[mesAtual.getMonth()]} {mesAtual.getFullYear()}</Text>
+          <TouchableOpacity onPress={() => setMesAtual(new Date(mesAtual.setMonth(mesAtual.getMonth()+1)))}><Text style={{color: Cores.destaque, fontSize: 24}}>▶</Text></TouchableOpacity>
+        </View>
+        <View style={[styles.resumoMensalCard, {backgroundColor: Cores.card}]}>
+            <Text style={{color: Cores.sub, fontSize: 12, fontWeight: 'bold'}}>VOLUME TOTAL DO MÊS</Text>
+            <Text style={{color: Cores.destaque, fontSize: 32, fontWeight: 'bold'}}>{totalMensal} <Text style={{fontSize: 16}}>kg</Text></Text>
         </View>
         <FlatList data={filtrado} contentContainerStyle={{padding: 15}} renderItem={({item}) => (
           <View style={[styles.menuItem, {backgroundColor: Cores.card}]}>
@@ -151,6 +165,7 @@ export default function App() {
         </View>
         <FlatList data={exercicios[treinoAtivo]} contentContainerStyle={{padding: 15}} renderItem={({item}) => {
             const concluido = item.feitas >= item.series;
+            const isTempo = item.nome.toLowerCase().includes('prancha') || item.nome.toLowerCase().includes('seg');
             const updateEx = (k, v) => {
                 const nl = [...exercicios[treinoAtivo]]; const i = nl.findIndex(e => e.id === item.id); nl[i][k] = v;
                 const c = {...exercicios}; c[treinoAtivo] = nl; setExercicios(c); save(c);
@@ -160,15 +175,26 @@ export default function App() {
                 <TextInput style={[styles.exName, {color: Cores.texto}]} value={item.nome} onChangeText={(v) => updateEx('nome', v)} />
                 <View style={styles.controlsRow}>
                   <Stepper label="SÉRIES" val={item.series} onMin={() => updateEx('series', Math.max(1, item.series-1))} onAdd={() => updateEx('series', item.series+1)} />
-                  <Stepper label="REPS" val={item.rep} onMin={() => updateEx('rep', Math.max(1, item.rep-1))} onAdd={() => updateEx('rep', item.rep+1)} />
+                  <Stepper label={isTempo ? "SEG" : "REPS"} val={item.rep} onMin={() => updateEx('rep', Math.max(1, item.rep-1))} onAdd={() => updateEx('rep', item.rep+1)} />
                   <Stepper label="KG" val={item.carga} onMin={() => updateEx('carga', Math.max(0, item.carga-1))} onAdd={() => updateEx('carga', item.carga+1)} />
                 </View>
-                <TouchableOpacity style={[styles.btnAction, {backgroundColor: Cores.destaque}]} onPress={() => {
+                <TouchableOpacity 
+                  style={[styles.btnAction, {backgroundColor: isTempo ? Cores.success : Cores.destaque}]} 
+                  onPress={() => {
                     if (concluido) return updateEx('feitas', 0);
-                    updateEx('feitas', item.feitas + 1);
-                    rodarTimer(tempoDescanso);
+                    if (isTempo) {
+                        // Se for tempo, dispara o cronômetro com o valor de 'rep' (segundos)
+                        rodarTimer(item.rep, 'execucao');
+                        updateEx('feitas', item.feitas + 1);
+                    } else {
+                        // Se for repetições, marca a série e dispara o descanso padrão
+                        updateEx('feitas', item.feitas + 1);
+                        rodarTimer(tempoDescanso, 'descanso');
+                    }
                 }}>
-                  <Text style={styles.btnTxtAction}>{concluido ? 'REINICIAR' : `SÉRIE ${item.feitas + 1}`}</Text>
+                    <Text style={styles.btnTxtAction}>
+                        {concluido ? 'REINICIAR' : isTempo ? `INICIAR ${item.rep}s` : `SÉRIE ${item.feitas + 1}`}
+                    </Text>
                 </TouchableOpacity>
               </View>
             );
@@ -178,8 +204,13 @@ export default function App() {
           {timerAtivo && <ManterTelaAcesa />}
           <View style={styles.timerOverlay}>
             <View style={[styles.timerBox, {backgroundColor: Cores.card}]}>
-              <Text style={[styles.timerNum, {color: Cores.texto}]}>{segundos}s</Text>
-              <TouchableOpacity style={[styles.btnSkip, {backgroundColor: Cores.danger}]} onPress={() => { clearInterval(timerRef.current); setTimerAtivo(false); }}><Text style={{color: '#FFF'}}>PULAR</Text></TouchableOpacity>
+              <Text style={{color: Cores.sub, fontWeight: 'bold', marginBottom: 10}}>
+                  {tipoTimer === 'execucao' ? 'EXECUTANDO...' : 'DESCANSO'}
+              </Text>
+              <Text style={[styles.timerNum, {color: tipoTimer === 'execucao' ? Cores.success : Cores.texto}]}>{segundos}s</Text>
+              <TouchableOpacity style={[styles.btnSkip, {backgroundColor: Cores.danger}]} onPress={() => { clearInterval(timerRef.current); setTimerAtivo(false); }}>
+                  <Text style={{color: '#FFF', fontWeight: 'bold'}}>PULAR</Text>
+              </TouchableOpacity>
             </View>
           </View>
         </Modal>
@@ -191,9 +222,9 @@ export default function App() {
     <SafeAreaView style={[styles.container, {backgroundColor: Cores.bg}]}>
       <View style={styles.header}><TextInput style={[styles.headerTitle, {color: Cores.texto}]} value={appTitle} onChangeText={setAppTitle} onEndEditing={() => save(null, null, null, appTitle)} /></View>
       <ScrollView contentContainerStyle={{padding: 15}}>
-        <TouchableOpacity style={[styles.btnHist, {borderColor: Cores.destaque, borderWidth: 1}]} onPress={() => setTela('historico')}><Text style={{color: Cores.destaque}}>📜 VER HISTÓRICO</Text></TouchableOpacity>
+        <TouchableOpacity style={[styles.btnHist, {borderColor: Cores.destaque, borderWidth: 1}]} onPress={() => setTela('historico')}><Text style={{color: Cores.destaque, fontWeight: 'bold'}}>📜 VER HISTÓRICO</Text></TouchableOpacity>
         <View style={[styles.descansoCard, {backgroundColor: Cores.card}]}>
-            <Text style={{color: Cores.sub, fontSize: 10, fontWeight: 'bold'}}>DESCANSO PADRÃO</Text>
+            <Text style={{color: Cores.sub, fontSize: 10, fontWeight: 'bold'}}>DESCANSO ENTRE SÉRIES (REPS)</Text>
             <View style={{flexDirection: 'row', alignItems: 'center', gap: 20}}>
                 <TouchableOpacity onPress={() => { const n = Math.max(10, tempoDescanso-10); setTempoDescanso(n); save(null,null,n); }}><Text style={[styles.stepAction, {color: Cores.destaque}]}>-</Text></TouchableOpacity>
                 <Text style={[styles.stepVal, {color: Cores.texto}]}>{tempoDescanso}s</Text>
@@ -236,7 +267,8 @@ const styles = StyleSheet.create({
   menuItemTxt: { fontSize: 16, fontWeight: 'bold', flex: 1 },
   btnGo: { width: 40, height: 40, borderRadius: 20, justifyContent: 'center', alignItems: 'center' },
   btnHist: { padding: 15, borderRadius: 10, alignItems: 'center', marginBottom: 20 },
-  mesSelector: { flexDirection: 'row', justifyContent: 'space-between', padding: 20 },
+  mesSelector: { flexDirection: 'row', justifyContent: 'space-between', paddingHorizontal: 30, paddingVertical: 10, alignItems: 'center' },
+  resumoMensalCard: { marginHorizontal: 15, padding: 20, borderRadius: 15, alignItems: 'center', marginBottom: 10 },
   descansoCard: { padding: 20, borderRadius: 15, alignItems: 'center', marginBottom: 20 },
   stepAction: { fontSize: 30, paddingHorizontal: 20 },
   stepVal: { fontSize: 24, fontWeight: 'bold' },
@@ -247,4 +279,4 @@ const styles = StyleSheet.create({
   timerNum: { fontSize: 60, fontWeight: 'bold', marginBottom: 20 },
   btnSkip: { padding: 10, borderRadius: 10, width: 100, alignItems: 'center' }
 });
-    
+      
