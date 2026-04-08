@@ -70,12 +70,14 @@ export default function App() {
   }, []);
 
   const save = async (d, h, t, title, th, ord) => {
-    if (d) await AsyncStorage.setItem('@gym_v54_data', JSON.stringify(d));
-    if (h) await AsyncStorage.setItem('@gym_v54_hist', JSON.stringify(h));
-    if (t) await AsyncStorage.setItem('@gym_v54_desc', t.toString());
-    if (title) await AsyncStorage.setItem('@gym_v54_title', title);
-    if (th) await AsyncStorage.setItem('@gym_v54_theme', th);
-    if (ord) await AsyncStorage.setItem('@gym_v54_order', JSON.stringify(ord));
+    try {
+        if (d) await AsyncStorage.setItem('@gym_v54_data', JSON.stringify(d));
+        if (h) await AsyncStorage.setItem('@gym_v54_hist', JSON.stringify(h));
+        if (t) await AsyncStorage.setItem('@gym_v54_desc', t.toString());
+        if (title) await AsyncStorage.setItem('@gym_v54_title', title);
+        if (th) await AsyncStorage.setItem('@gym_v54_theme', th);
+        if (ord) await AsyncStorage.setItem('@gym_v54_order', JSON.stringify(ord));
+    } catch(e) { console.log(e); }
   };
 
   const moverTreino = (direcao, nome) => {
@@ -87,7 +89,7 @@ export default function App() {
         [novaOrdem[index], novaOrdem[index + 1]] = [novaOrdem[index + 1], novaOrdem[index]];
     }
     setOrdemTreinos(novaOrdem);
-    save(null, null, null, null, null, novaOrdem);
+    save(null, null, null, null, null, novaOrdem); // Salva a nova ordem imediatamente
   };
 
   const rodarTimer = (t, tipo = 'descanso') => {
@@ -121,20 +123,12 @@ export default function App() {
 
   if (tela === 'historico') {
     const meses = ["Janeiro", "Fevereiro", "Março", "Abril", "Maio", "Junho", "Julho", "Agosto", "Setembro", "Outubro", "Novembro", "Dezembro"];
-    
-    // Filtro por Mês e Ano selecionado
     const filtrado = historico.filter(h => {
       const d = new Date(h.timestamp);
       return d.getMonth() === mesAtual.getMonth() && d.getFullYear() === mesAtual.getFullYear();
     });
-
-    // Cálculo do Volume Total
     const volumeTotalMensal = filtrado.reduce((acc, item) => acc + (item.volume || 0), 0);
-
-    const mudarMes = (direcao) => {
-        const novoMes = new Date(mesAtual.setMonth(mesAtual.getMonth() + direcao));
-        setMesAtual(new Date(novoMes));
-    };
+    const mudarMes = (direcao) => setMesAtual(new Date(mesAtual.setMonth(mesAtual.getMonth() + direcao)));
 
     return (
       <SafeAreaView style={[styles.container, {backgroundColor: Cores.bg}]}>
@@ -143,20 +137,15 @@ export default function App() {
           <Text style={[styles.headerTitle, {color: Cores.texto}]}>HISTÓRICO</Text>
           <TouchableOpacity onPress={() => { setHistorico([]); save(null, []); }}><Text style={{color: Cores.danger, paddingRight: 20, fontWeight:'bold'}}>LIMPAR</Text></TouchableOpacity>
         </View>
-
-        {/* Seletor de Mês */}
         <View style={styles.mesSelector}>
           <TouchableOpacity onPress={() => mudarMes(-1)}><Text style={{color: Cores.destaque, fontSize: 24, padding: 10}}>◀</Text></TouchableOpacity>
           <Text style={{color: Cores.texto, fontWeight: 'bold', fontSize: 18}}>{meses[mesAtual.getMonth()]} {mesAtual.getFullYear()}</Text>
           <TouchableOpacity onPress={() => mudarMes(1)}><Text style={{color: Cores.destaque, fontSize: 24, padding: 10}}>▶</Text></TouchableOpacity>
         </View>
-
-        {/* Card de Volume Total */}
         <View style={[styles.resumoCard, {backgroundColor: Cores.card}]}>
             <Text style={{color: Cores.sub, fontSize: 12, fontWeight: 'bold'}}>CARGA TOTAL NO MÊS</Text>
             <Text style={{color: Cores.destaque, fontSize: 32, fontWeight: 'bold'}}>{volumeTotalMensal} <Text style={{fontSize: 16}}>kg</Text></Text>
         </View>
-
         <FlatList data={filtrado} contentContainerStyle={{padding: 15}} renderItem={({item}) => (
           <View style={[styles.menuItem, {backgroundColor: Cores.card}]}>
             <View style={{flex: 1}}>
@@ -321,4 +310,4 @@ const styles = StyleSheet.create({
   timerNum: { fontSize: 60, fontWeight: 'bold', marginBottom: 20 },
   btnSkip: { padding: 10, borderRadius: 10, width: 100, alignItems: 'center' }
 });
-                    
+          
