@@ -21,7 +21,7 @@ export default function App() {
   const [tema, setTema] = useState('dark');
   const [treinoAtivo, setTreinoAtivo] = useState(null);
   const [exercicios, setExercicios] = useState({});
-  const [ordemTreinos, setOrdemTreinos] = useState([]); // NOVO: Controle de ordem dos treinos
+  const [ordemTreinos, setOrdemTreinos] = useState([]);
   const [historico, setHistorico] = useState([]);
   const [tela, setTela] = useState('menu');
   const [tempoDescanso, setTempoDescanso] = useState(60);
@@ -57,14 +57,15 @@ export default function App() {
         if (d) {
             const parsedData = JSON.parse(d);
             setExercicios(parsedData);
-            // Se houver ordem salva, usa ela. Se não, pega as chaves do objeto.
             setOrdemTreinos(savedOrder ? JSON.parse(savedOrder) : Object.keys(parsedData));
         }
         if (h) setHistorico(JSON.parse(h));
         if (t) setTempoDescanso(parseInt(t));
         if (title) setAppTitle(title);
         if (savedTheme) setTema(savedTheme);
-      } catch (e) { console.log(e); } finally {
+      } catch (e) { 
+        console.log(e); 
+      } finally {
         setAppPronto(true);
         await SplashScreen.hideAsync();
       }
@@ -73,12 +74,16 @@ export default function App() {
   }, []);
 
   const save = async (d, h, t, title, th, ord) => {
-    if (d) await AsyncStorage.setItem('@gym_v54_data', JSON.stringify(d));
-    if (h) await AsyncStorage.setItem('@gym_v54_hist', JSON.stringify(h));
-    if (t) await AsyncStorage.setItem('@gym_v54_desc', t.toString());
-    if (title) await AsyncStorage.setItem('@gym_v54_title', title);
-    if (th) await AsyncStorage.setItem('@gym_v54_theme', th);
-    if (ord) await AsyncStorage.setItem('@gym_v54_order', JSON.stringify(ord));
+    try {
+      if (d) await AsyncStorage.setItem('@gym_v54_data', JSON.stringify(d));
+      if (h) await AsyncStorage.setItem('@gym_v54_hist', JSON.stringify(h));
+      if (t) await AsyncStorage.setItem('@gym_v54_desc', t.toString());
+      if (title) await AsyncStorage.setItem('@gym_v54_title', title);
+      if (th) await AsyncStorage.setItem('@gym_v54_theme', th);
+      if (ord) await AsyncStorage.setItem('@gym_v54_order', JSON.stringify(ord));
+    } catch (e) {
+      console.log("Erro ao salvar:", e);
+    }
   };
 
   const moverTreino = (direcao, nome) => {
@@ -91,6 +96,19 @@ export default function App() {
     }
     setOrdemTreinos(novaOrdem);
     save(null, null, null, null, null, novaOrdem);
+  };
+
+  const moverExercicio = (direcao, id) => {
+    const lista = [...exercicios[treinoAtivo]];
+    const index = lista.findIndex(e => e.id === id);
+    if (direcao === 'up' && index > 0) {
+      [lista[index], lista[index - 1]] = [lista[index - 1], lista[index]];
+    } else if (direcao === 'down' && index < lista.length - 1) {
+      [lista[index], lista[index + 1]] = [lista[index + 1], lista[index]];
+    }
+    const novosEx = { ...exercicios, [treinoAtivo]: lista };
+    setExercicios(novosEx);
+    save(novosEx);
   };
 
   const rodarTimer = (t, tipo = 'descanso') => {
@@ -110,7 +128,7 @@ export default function App() {
   };
 
   const finalizarTreino = () => {
-    const listaAtual = exercicios[treinoAtivo];
+    const listaAtual = exercicios[treinoAtivo] || [];
     const volume = listaAtual.reduce((a, e) => a + (e.feitas * e.rep * e.carga), 0);
     const agora = new Date();
     const pendentes = listaAtual.filter(e => e.feitas === 0);
@@ -122,26 +140,6 @@ export default function App() {
 
     setHistorico(nH); setExercicios(nE); save(nE, nH); setTela('menu');
     Vibration.vibrate(200);
-  };
-
-  const removerItemHistorico = (id) => {
-    const novoH = historico.filter(h => h.id !== id);
-    setHistorico(novoH);
-    save(null, novoH);
-    Vibration.vibrate(50);
-  };
-
-  const moverExercicio = (direcao, id) => {
-    const lista = [...exercicios[treinoAtivo]];
-    const index = lista.findIndex(e => e.id === id);
-    if (direcao === 'up' && index > 0) {
-      [lista[index], lista[index - 1]] = [lista[index - 1], lista[index]];
-    } else if (direcao === 'down' && index < lista.length - 1) {
-      [lista[index], lista[index + 1]] = [lista[index + 1], lista[index]];
-    }
-    const novosEx = { ...exercicios, [treinoAtivo]: lista };
-    setExercicios(novosEx);
-    save(novosEx);
   };
 
   const Stepper = ({ label, val, onMin, onAdd }) => (
@@ -188,9 +186,10 @@ export default function App() {
                 <Text style={{color: Cores.sub, fontSize: 12}}>{item.dataStr}</Text>
             </View>
             <Text style={{color: Cores.destaque, fontWeight: 'bold', marginRight: 10}}>{item.volume} kg</Text>
-            <TouchableOpacity onPress={() => removerItemHistorico(item.id)}>
-                <Text style={{fontSize: 20}}>🗑️</Text>
-            </TouchableOpacity>
+            <TouchableOpacity onPress={() => {
+                const novoH = historico.filter(h => h.id !== item.id);
+                setHistorico(novoH); save(null, novoH);
+            }}><Text style={{fontSize: 20}}>🗑️</Text></TouchableOpacity>
           </View>
         )} />
       </SafeAreaView>
@@ -220,9 +219,9 @@ export default function App() {
               <View style={[styles.card, {backgroundColor: Cores.card, opacity: concluido ? 0.5 : 1, marginBottom: 15}]}>
                 <View style={{flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between'}}>
                     <TextInput style={[styles.exName, {color: Cores.texto, flex: 1}]} value={item.nome} onChangeText={(v) => updateEx('nome', v)} />
-                    <View style={{flexDirection: 'row', gap: 15}}>
-                        {index > 0 && <TouchableOpacity onPress={() => moverExercicio('up', item.id)}><Text style={{color: Cores.destaque, fontSize: 18}}>▲</Text></TouchableOpacity>}
-                        {index < lista.length - 1 && <TouchableOpacity onPress={() => moverExercicio('down', item.id)}><Text style={{color: Cores.destaque, fontSize: 18}}>▼</Text></TouchableOpacity>}
+                    <View style={{flexDirection: 'row'}}>
+                        {index > 0 && <TouchableOpacity style={{marginRight: 15}} onPress={() => moverExercicio('up', item.id)}><Text style={{color: Cores.destaque, fontSize: 18}}>▲</Text></TouchableOpacity>}
+                        {index < lista.length - 1 && <TouchableOpacity style={{marginRight: 15}} onPress={() => moverExercicio('down', item.id)}><Text style={{color: Cores.destaque, fontSize: 18}}>▼</Text></TouchableOpacity>}
                         <TouchableOpacity onPress={() => {
                             const nl = exercicios[treinoAtivo].filter(e => e.id !== item.id);
                             const c = {...exercicios, [treinoAtivo]: nl}; setExercicios(c); save(c);
@@ -274,26 +273,33 @@ export default function App() {
 
   return (
     <SafeAreaView style={[styles.container, {backgroundColor: Cores.bg}]}>
-      <View style={styles.header}><TextInput style={[styles.headerTitle, {color: Cores.texto}]} value={appTitle} onChangeText={setAppTitle} onEndEditing={() => save(null, null, null, appTitle)} /></View>
+      <View style={styles.header}>
+          <TextInput 
+            style={[styles.headerTitle, {color: Cores.texto}]} 
+            value={appTitle} 
+            onChangeText={setAppTitle} 
+            onEndEditing={() => save(null, null, null, appTitle)} 
+          />
+      </View>
       <ScrollView contentContainerStyle={{padding: 15}}>
         <TouchableOpacity style={[styles.btnHist, {borderColor: Cores.destaque, borderWidth: 1}]} onPress={() => setTela('historico')}><Text style={{color: Cores.destaque, fontWeight: 'bold'}}>📜 VER HISTÓRICO</Text></TouchableOpacity>
         
         <View style={[styles.descansoCard, {backgroundColor: Cores.card}]}>
-            <Text style={{color: Cores.sub, fontSize: 10, fontWeight: 'bold'}}>DESCANSO ENTRE SÉRIES (REPS)</Text>
-            <View style={{flexDirection: 'row', alignItems: 'center', gap: 20}}>
-                <TouchableOpacity onPress={() => { const n = Math.max(10, tempoDescanso-10); setTempoDescanso(n); save(null,null,n); }}><Text style={[styles.stepAction, {color: Cores.destaque}]}>-</Text></TouchableOpacity>
+            <Text style={{color: Cores.sub, fontSize: 10, fontWeight: 'bold', marginBottom: 10}}>DESCANSO ENTRE SÉRIES (REPS)</Text>
+            <View style={{flexDirection: 'row', alignItems: 'center'}}>
+                <TouchableOpacity onPress={() => { const n = Math.max(10, tempoDescanso-10); setTempoDescanso(n); save(null,null,n); }}><Text style={[styles.stepAction, {color: Cores.destaque, paddingHorizontal: 20}]}>-</Text></TouchableOpacity>
                 <Text style={[styles.stepVal, {color: Cores.texto}]}>{tempoDescanso}s</Text>
-                <TouchableOpacity onPress={() => { const n = tempoDescanso+10; setTempoDescanso(n); save(null,null,n); }}><Text style={[styles.stepAction, {color: Cores.destaque}]}>+</Text></TouchableOpacity>
+                <TouchableOpacity onPress={() => { const n = tempoDescanso+10; setTempoDescanso(n); save(null,null,n); }}><Text style={[styles.stepAction, {color: Cores.destaque, paddingHorizontal: 20}]}>+</Text></TouchableOpacity>
             </View>
         </View>
 
         {ordemTreinos.map((nome, index) => (
           <View key={nome} style={[styles.menuItem, {backgroundColor: Cores.card}]}>
             <Text style={[styles.menuItemTxt, {color: Cores.texto}]}>{nome}</Text>
-            <View style={{flexDirection: 'row', gap: 12, alignItems: 'center'}}>
-                {index > 0 && <TouchableOpacity onPress={() => moverTreino('up', nome)}><Text style={{color: Cores.destaque, fontSize: 18}}>▲</Text></TouchableOpacity>}
-                {index < ordemTreinos.length - 1 && <TouchableOpacity onPress={() => moverTreino('down', nome)}><Text style={{color: Cores.destaque, fontSize: 18}}>▼</Text></TouchableOpacity>}
-                <TouchableOpacity onPress={() => { setTreinoAtivo(nome); setTela('treino'); }} style={[styles.btnGo, {backgroundColor: Cores.destaque}]}><Text style={{color: '#FFF'}}>▶</Text></TouchableOpacity>
+            <View style={{flexDirection: 'row', alignItems: 'center'}}>
+                {index > 0 && <TouchableOpacity style={{marginRight: 12}} onPress={() => moverTreino('up', nome)}><Text style={{color: Cores.destaque, fontSize: 18}}>▲</Text></TouchableOpacity>}
+                {index < ordemTreinos.length - 1 && <TouchableOpacity style={{marginRight: 12}} onPress={() => moverTreino('down', nome)}><Text style={{color: Cores.destaque, fontSize: 18}}>▼</Text></TouchableOpacity>}
+                <TouchableOpacity onPress={() => { setTreinoAtivo(nome); setTela('treino'); }} style={[styles.btnGo, {backgroundColor: Cores.destaque, marginRight: 12}]}><Text style={{color: '#FFF'}}>▶</Text></TouchableOpacity>
                 <TouchableOpacity onPress={() => { 
                     const c = {...exercicios}; delete c[nome]; 
                     const novaOrd = ordemTreinos.filter(n => n !== nome);
@@ -319,8 +325,8 @@ export default function App() {
 
 const styles = StyleSheet.create({
   container: { flex: 1 },
-  header: { paddingTop: 50, paddingBottom: 20, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
-  headerTitle: { fontSize: 28, fontWeight: 'bold', textAlign: 'center', flex: 1 },
+  header: { paddingTop: 50, paddingBottom: 20, flexDirection: 'row', alignItems: 'center', justifyContent: 'center' },
+  headerTitle: { fontSize: 28, fontWeight: 'bold', textAlign: 'center', width: '100%' },
   backLink: { paddingHorizontal: 20, fontSize: 20 },
   addExBtn: { paddingHorizontal: 20, fontWeight: 'bold' },
   card: { borderRadius: 15, padding: 15 },
@@ -334,15 +340,14 @@ const styles = StyleSheet.create({
   btnTxtAction: { color: '#FFF', fontWeight: 'bold' },
   btnFinalizar: { padding: 20, borderRadius: 10, alignItems: 'center', marginTop: 20 },
   btnTxtFinalizar: { color: '#FFF', fontWeight: 'bold' },
-  menuItem: { padding: 15, borderRadius: 12, flexDirection: 'row', alignItems: 'center', marginBottom: 10, gap: 10 },
+  menuItem: { padding: 15, borderRadius: 12, flexDirection: 'row', alignItems: 'center', marginBottom: 10 },
   menuItemTxt: { fontSize: 16, fontWeight: 'bold', flex: 1 },
   btnGo: { width: 36, height: 36, borderRadius: 18, justifyContent: 'center', alignItems: 'center' },
   btnHist: { padding: 15, borderRadius: 10, alignItems: 'center', marginBottom: 20 },
   mesSelector: { flexDirection: 'row', justifyContent: 'space-between', paddingHorizontal: 30, paddingVertical: 10, alignItems: 'center' },
   resumoMensalCard: { marginHorizontal: 15, padding: 20, borderRadius: 15, alignItems: 'center', marginBottom: 10 },
   descansoCard: { padding: 20, borderRadius: 15, alignItems: 'center', marginBottom: 20 },
-  stepAction: { fontSize: 30, paddingHorizontal: 20 },
+  stepAction: { fontSize: 30 },
   stepVal: { fontSize: 24, fontWeight: 'bold' },
   inputMenu: { padding: 15, borderRadius: 10, marginTop: 10 },
-  btnMenu: { padding: 15, borderRadius: 10, alignItems: 'center', marginTop: 10 },
-  timerOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.8)', justifyConte
+  btnMenu: { padding: 15, borderRadius: 10, alignItems: 
