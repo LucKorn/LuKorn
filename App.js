@@ -71,13 +71,13 @@ export default function App() {
 
   const save = async (d, h, t, title, th, ord) => {
     try {
-        if (d) await AsyncStorage.setItem('@gym_v54_data', JSON.stringify(d));
-        if (h) await AsyncStorage.setItem('@gym_v54_hist', JSON.stringify(h));
-        if (t) await AsyncStorage.setItem('@gym_v54_desc', t.toString());
-        if (title) await AsyncStorage.setItem('@gym_v54_title', title);
-        if (th) await AsyncStorage.setItem('@gym_v54_theme', th);
-        if (ord) await AsyncStorage.setItem('@gym_v54_order', JSON.stringify(ord));
-    } catch(e) { console.log(e); }
+      if (d) await AsyncStorage.setItem('@gym_v54_data', JSON.stringify(d));
+      if (h) await AsyncStorage.setItem('@gym_v54_hist', JSON.stringify(h));
+      if (t) await AsyncStorage.setItem('@gym_v54_desc', t.toString());
+      if (title) await AsyncStorage.setItem('@gym_v54_title', title);
+      if (th) await AsyncStorage.setItem('@gym_v54_theme', th);
+      if (ord) await AsyncStorage.setItem('@gym_v54_order', JSON.stringify(ord));
+    } catch (e) { console.log("Erro ao salvar:", e); }
   };
 
   const moverTreino = (direcao, nome) => {
@@ -89,7 +89,7 @@ export default function App() {
         [novaOrdem[index], novaOrdem[index + 1]] = [novaOrdem[index + 1], novaOrdem[index]];
     }
     setOrdemTreinos(novaOrdem);
-    save(null, null, null, null, null, novaOrdem); // Salva a nova ordem imediatamente
+    save(null, null, null, null, null, novaOrdem);
   };
 
   const rodarTimer = (t, tipo = 'descanso') => {
@@ -101,6 +101,7 @@ export default function App() {
       if(s <= 1){ 
         clearInterval(timerRef.current); 
         setTimerAtivo(false); 
+        // Padrão: Espera 0ms, Vibra 500ms, Espera 200ms, Vibra 500ms
         Vibration.vibrate([0, 500, 200, 500]); 
         return 0; 
       }
@@ -147,7 +148,7 @@ export default function App() {
             <Text style={{color: Cores.destaque, fontSize: 32, fontWeight: 'bold'}}>{volumeTotalMensal} <Text style={{fontSize: 16}}>kg</Text></Text>
         </View>
         <FlatList data={filtrado} contentContainerStyle={{padding: 15}} renderItem={({item}) => (
-          <View style={[styles.menuItem, {backgroundColor: Cores.card}]}>
+          <View style={[styles.menuItem, {backgroundColor: Cores.card, marginBottom: 10}]}>
             <View style={{flex: 1}}>
                 <Text style={{color: Cores.texto, fontWeight: 'bold'}}>{item.treino}</Text>
                 <Text style={{color: Cores.sub, fontSize: 12}}>{item.dataStr}</Text>
@@ -236,9 +237,9 @@ export default function App() {
     <SafeAreaView style={[styles.container, {backgroundColor: Cores.bg}]}>
       <View style={styles.header}><TextInput style={[styles.headerTitle, {color: Cores.texto}]} value={appTitle} onChangeText={setAppTitle} onEndEditing={() => save(null, null, null, appTitle)} /></View>
       <ScrollView contentContainerStyle={{padding: 15}}>
-        <TouchableOpacity style={[styles.btnHist, {borderColor: Cores.destaque, borderWidth: 1}]} onPress={() => setTela('historico')}><Text style={{color: Cores.destaque, fontWeight: 'bold'}}>📜 VER HISTÓRICO</Text></TouchableOpacity>
+        <TouchableOpacity style={[styles.btnHist, {borderColor: Cores.destaque, borderWidth: 1, marginBottom: 20}]} onPress={() => setTela('historico')}><Text style={{color: Cores.destaque, fontWeight: 'bold'}}>📜 VER HISTÓRICO</Text></TouchableOpacity>
         
-        <View style={[styles.descansoCard, {backgroundColor: Cores.card}]}>
+        <View style={[styles.descansoCard, {backgroundColor: Cores.card, marginBottom: 20}]}>
             <Text style={{color: Cores.sub, fontSize: 10, fontWeight: 'bold', marginBottom: 10}}>DESCANSO ENTRE SÉRIES (REPS)</Text>
             <View style={styles.rowCentered}>
                 <TouchableOpacity onPress={() => { const n = Math.max(10, tempoDescanso-10); setTempoDescanso(n); save(null,null,n); }}><Text style={[styles.stepAction, {color: Cores.destaque}]}>-</Text></TouchableOpacity>
@@ -248,7 +249,7 @@ export default function App() {
         </View>
 
         {ordemTreinos.map((nome, index) => (
-          <View key={nome} style={[styles.menuItem, {backgroundColor: Cores.card}]}>
+          <View key={nome} style={[styles.menuItem, {backgroundColor: Cores.card, marginBottom: 10}]}>
             <Text style={[styles.menuItemTxt, {color: Cores.texto}]}>{nome}</Text>
             <View style={styles.rowCentered}>
                 {index > 0 && <TouchableOpacity style={{marginRight: 12}} onPress={() => moverTreino('up', nome)}><Text style={{color: Cores.destaque, fontSize: 18}}>▲</Text></TouchableOpacity>}
@@ -262,8 +263,8 @@ export default function App() {
           </View>
         ))}
 
-        <TextInput style={[styles.inputMenu, {backgroundColor: Cores.card, color: Cores.texto}]} placeholder="Novo treino..." placeholderTextColor={Cores.sub} value={novoTreinoNome} onChangeText={setNovoTreinoNome} />
-        <TouchableOpacity style={[styles.btnMenu, {backgroundColor: Cores.destaque}]} onPress={() => { 
+        <TextInput style={[styles.inputMenu, {backgroundColor: Cores.card, color: Cores.texto, marginTop: 10}]} placeholder="Novo treino..." placeholderTextColor={Cores.sub} value={novoTreinoNome} onChangeText={setNovoTreinoNome} />
+        <TouchableOpacity style={[styles.btnMenu, {backgroundColor: Cores.destaque, marginTop: 10}]} onPress={() => { 
             if(!novoTreinoNome) return; const nE = {...exercicios, [novoTreinoNome]: []}; const novaOrd = [...ordemTreinos, novoTreinoNome];
             setExercicios(nE); setOrdemTreinos(novaOrd); setNovoTreinoNome(''); save(nE, null, null, null, null, novaOrd); 
         }}><Text style={{color: '#FFF', fontWeight: 'bold'}}>+ ADICIONAR TREINO</Text></TouchableOpacity>
@@ -291,23 +292,23 @@ const styles = StyleSheet.create({
   stepValCard: { fontSize: 16, fontWeight: 'bold', width: 30, textAlign: 'center' },
   btnAction: { padding: 15, borderRadius: 10, alignItems: 'center' },
   btnTxtAction: { color: '#FFF', fontWeight: 'bold' },
-  btnFinalizar: { padding: 20, borderRadius: 10, alignItems: 'center', marginTop: 20 },
+  btnFinalizar: { padding: 20, borderRadius: 10, alignItems: 'center', marginTop: 10 },
   btnTxtFinalizar: { color: '#FFF', fontWeight: 'bold' },
-  menuItem: { padding: 15, borderRadius: 12, flexDirection: 'row', alignItems: 'center', marginBottom: 10 },
+  menuItem: { padding: 15, borderRadius: 12, flexDirection: 'row', alignItems: 'center' },
   menuItemTxt: { fontSize: 16, fontWeight: 'bold', flex: 1 },
   btnGo: { width: 36, height: 36, borderRadius: 18, justifyContent: 'center', alignItems: 'center' },
-  btnHist: { padding: 15, borderRadius: 10, alignItems: 'center', marginBottom: 20 },
+  btnHist: { padding: 15, borderRadius: 10, alignItems: 'center' },
   mesSelector: { flexDirection: 'row', justifyContent: 'space-between', paddingHorizontal: 20, paddingVertical: 10, alignItems: 'center' },
   resumoCard: { marginHorizontal: 15, padding: 20, borderRadius: 15, alignItems: 'center', marginBottom: 10 },
-  descansoCard: { padding: 20, borderRadius: 15, alignItems: 'center', marginBottom: 20 },
+  descansoCard: { padding: 20, borderRadius: 15, alignItems: 'center' },
   rowCentered: { flexDirection: 'row', alignItems: 'center' },
   stepAction: { fontSize: 30, paddingHorizontal: 25 },
   stepVal: { fontSize: 24, fontWeight: 'bold' },
-  inputMenu: { padding: 15, borderRadius: 10, marginTop: 10 },
-  btnMenu: { padding: 15, borderRadius: 10, alignItems: 'center', marginTop: 10 },
+  inputMenu: { padding: 15, borderRadius: 10 },
+  btnMenu: { padding: 15, borderRadius: 10, alignItems: 'center' },
   timerOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.8)', justifyContent: 'center', alignItems: 'center' },
   timerBox: { padding: 40, borderRadius: 20, alignItems: 'center' },
   timerNum: { fontSize: 60, fontWeight: 'bold', marginBottom: 20 },
   btnSkip: { padding: 10, borderRadius: 10, width: 100, alignItems: 'center' }
 });
-          
+    
