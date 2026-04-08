@@ -170,4 +170,3 @@ const styles = StyleSheet.create({
     paddingVertical: 12, borderBottomWidth: 0.5, borderBottomColor: '#30363D44' 
   }
 });
-
