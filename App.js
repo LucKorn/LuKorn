@@ -121,10 +121,21 @@ export default function App() {
 
   if (tela === 'historico') {
     const meses = ["Janeiro", "Fevereiro", "Março", "Abril", "Maio", "Junho", "Julho", "Agosto", "Setembro", "Outubro", "Novembro", "Dezembro"];
+    
+    // Filtro por Mês e Ano selecionado
     const filtrado = historico.filter(h => {
       const d = new Date(h.timestamp);
       return d.getMonth() === mesAtual.getMonth() && d.getFullYear() === mesAtual.getFullYear();
     });
+
+    // Cálculo do Volume Total
+    const volumeTotalMensal = filtrado.reduce((acc, item) => acc + (item.volume || 0), 0);
+
+    const mudarMes = (direcao) => {
+        const novoMes = new Date(mesAtual.setMonth(mesAtual.getMonth() + direcao));
+        setMesAtual(new Date(novoMes));
+    };
+
     return (
       <SafeAreaView style={[styles.container, {backgroundColor: Cores.bg}]}>
         <View style={styles.header}>
@@ -132,6 +143,20 @@ export default function App() {
           <Text style={[styles.headerTitle, {color: Cores.texto}]}>HISTÓRICO</Text>
           <TouchableOpacity onPress={() => { setHistorico([]); save(null, []); }}><Text style={{color: Cores.danger, paddingRight: 20, fontWeight:'bold'}}>LIMPAR</Text></TouchableOpacity>
         </View>
+
+        {/* Seletor de Mês */}
+        <View style={styles.mesSelector}>
+          <TouchableOpacity onPress={() => mudarMes(-1)}><Text style={{color: Cores.destaque, fontSize: 24, padding: 10}}>◀</Text></TouchableOpacity>
+          <Text style={{color: Cores.texto, fontWeight: 'bold', fontSize: 18}}>{meses[mesAtual.getMonth()]} {mesAtual.getFullYear()}</Text>
+          <TouchableOpacity onPress={() => mudarMes(1)}><Text style={{color: Cores.destaque, fontSize: 24, padding: 10}}>▶</Text></TouchableOpacity>
+        </View>
+
+        {/* Card de Volume Total */}
+        <View style={[styles.resumoCard, {backgroundColor: Cores.card}]}>
+            <Text style={{color: Cores.sub, fontSize: 12, fontWeight: 'bold'}}>CARGA TOTAL NO MÊS</Text>
+            <Text style={{color: Cores.destaque, fontSize: 32, fontWeight: 'bold'}}>{volumeTotalMensal} <Text style={{fontSize: 16}}>kg</Text></Text>
+        </View>
+
         <FlatList data={filtrado} contentContainerStyle={{padding: 15}} renderItem={({item}) => (
           <View style={[styles.menuItem, {backgroundColor: Cores.card}]}>
             <View style={{flex: 1}}>
@@ -237,10 +262,10 @@ export default function App() {
           <View key={nome} style={[styles.menuItem, {backgroundColor: Cores.card}]}>
             <Text style={[styles.menuItemTxt, {color: Cores.texto}]}>{nome}</Text>
             <View style={styles.rowCentered}>
-                {index > 0 && <TouchableOpacity style={{marginRight: 10}} onPress={() => moverTreino('up', nome)}><Text style={{color: Cores.destaque, fontSize: 18}}>▲</Text></TouchableOpacity>}
-                {index < ordemTreinos.length - 1 && <TouchableOpacity style={{marginRight: 10}} onPress={() => moverTreino('down', nome)}><Text style={{color: Cores.destaque, fontSize: 18}}>▼</Text></TouchableOpacity>}
+                {index > 0 && <TouchableOpacity style={{marginRight: 12}} onPress={() => moverTreino('up', nome)}><Text style={{color: Cores.destaque, fontSize: 18}}>▲</Text></TouchableOpacity>}
+                {index < ordemTreinos.length - 1 && <TouchableOpacity style={{marginRight: 12}} onPress={() => moverTreino('down', nome)}><Text style={{color: Cores.destaque, fontSize: 18}}>▼</Text></TouchableOpacity>}
                 <TouchableOpacity onPress={() => { setTreinoAtivo(nome); setTela('treino'); }} style={[styles.btnGo, {backgroundColor: Cores.destaque}]}><Text style={{color: '#FFF'}}>▶</Text></TouchableOpacity>
-                <TouchableOpacity style={{marginLeft: 10}} onPress={() => { 
+                <TouchableOpacity style={{marginLeft: 12}} onPress={() => { 
                     const c = {...exercicios}; delete c[nome]; const novaOrd = ordemTreinos.filter(n => n !== nome);
                     setExercicios(c); setOrdemTreinos(novaOrd); save(c, null, null, null, null, novaOrd); 
                 }}><Text style={{fontSize: 20}}>🗑️</Text></TouchableOpacity>
@@ -283,6 +308,8 @@ const styles = StyleSheet.create({
   menuItemTxt: { fontSize: 16, fontWeight: 'bold', flex: 1 },
   btnGo: { width: 36, height: 36, borderRadius: 18, justifyContent: 'center', alignItems: 'center' },
   btnHist: { padding: 15, borderRadius: 10, alignItems: 'center', marginBottom: 20 },
+  mesSelector: { flexDirection: 'row', justifyContent: 'space-between', paddingHorizontal: 20, paddingVertical: 10, alignItems: 'center' },
+  resumoCard: { marginHorizontal: 15, padding: 20, borderRadius: 15, alignItems: 'center', marginBottom: 10 },
   descansoCard: { padding: 20, borderRadius: 15, alignItems: 'center', marginBottom: 20 },
   rowCentered: { flexDirection: 'row', alignItems: 'center' },
   stepAction: { fontSize: 30, paddingHorizontal: 25 },
@@ -294,4 +321,4 @@ const styles = StyleSheet.create({
   timerNum: { fontSize: 60, fontWeight: 'bold', marginBottom: 20 },
   btnSkip: { padding: 10, borderRadius: 10, width: 100, alignItems: 'center' }
 });
-          
+                    
