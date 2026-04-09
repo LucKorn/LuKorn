@@ -55,7 +55,6 @@ export default function App() {
         const parsedData = d ? JSON.parse(d) : {};
         setExercicios(parsedData);
         
-        // Garante que a ordem carregada seja a salva ou as chaves dos treinos
         if (savedOrder) {
           setOrdemTreinos(JSON.parse(savedOrder));
         } else {
@@ -85,7 +84,6 @@ export default function App() {
     } catch (e) { console.log("Erro ao salvar:", e); }
   };
 
-  // Funções de Fila (Reordenação)
   const moverItem = (lista, index, direcao) => {
     const novaLista = [...lista];
     if (direcao === 'up' && index > 0) {
@@ -111,7 +109,6 @@ export default function App() {
       if(s <= 1){ 
         clearInterval(timerRef.current); 
         setTimerAtivo(false); 
-        // Vibração tipo alarme: VIBRA 0.5s, PAUSA 0.2s, VIBRA 0.5s
         Vibration.vibrate([0, 500, 200, 500]); 
         return 0; 
       }
@@ -132,7 +129,6 @@ export default function App() {
 
   if (!appPronto) return null;
 
-  // TELA HISTÓRICO
   if (tela === 'historico') {
     const meses = ["Janeiro", "Fevereiro", "Março", "Abril", "Maio", "Junho", "Julho", "Agosto", "Setembro", "Outubro", "Novembro", "Dezembro"];
     const filtrado = historico.filter(h => {
@@ -175,7 +171,6 @@ export default function App() {
     );
   }
 
-  // TELA DE EXECUÇÃO DO TREINO
   if (tela === 'treino') {
     const lista = exercicios[treinoAtivo] || [];
     return (
@@ -229,12 +224,26 @@ export default function App() {
                 </TouchableOpacity>
               </View>
             );
-          }} ListFooterComponent={() => <TouchableOpacity style={[styles.btnFinalizar, {backgroundColor: Cores.destaque}]} onPress={() => {
+          }} 
+          ListFooterComponent={() => <TouchableOpacity style={[styles.btnFinalizar, {backgroundColor: Cores.destaque}]} onPress={() => {
+              // 1. Calcula volume e prepara histórico
               const v = exercicios[treinoAtivo].reduce((a, e) => a + (e.feitas * e.rep * e.carga), 0);
               const nH = [{ id: Date.now().toString(), treino: treinoAtivo, volume: v, dataStr: new Date().toLocaleDateString('pt-BR'), timestamp: Date.now() }, ...historico];
+              
+              // 2. Reseta as séries feitas deste treino
               const nE = {...exercicios, [treinoAtivo]: exercicios[treinoAtivo].map(e => ({...e, feitas: 0}))};
-              setHistorico(nH); setExercicios(nE); save(nE, nH); setTela('menu');
-          }}><Text style={styles.btnTxtFinalizar}>FINALIZAR TREINO</Text></TouchableOpacity>}
+              
+              // 3. LOGICA DE FILA: Move o treino atual para o final da lista
+              const novaOrdem = ordemTreinos.filter(n => n !== treinoAtivo);
+              novaOrdem.push(treinoAtivo);
+              
+              // 4. Atualiza estados e salva
+              setOrdemTreinos(novaOrdem);
+              setHistorico(nH); 
+              setExercicios(nE); 
+              save(nE, nH, null, null, null, novaOrdem); 
+              setTela('menu');
+          }}><Text style={styles.btnTxtFinalizar}>FINALIZAR TREINO E RODAR FILA</Text></TouchableOpacity>}
         />
         <Modal visible={timerAtivo} transparent animationType="fade">
           <View style={styles.timerOverlay}>
@@ -249,7 +258,6 @@ export default function App() {
     );
   }
 
-  // TELA MENU INICIAL
   return (
     <SafeAreaView style={[styles.container, {backgroundColor: Cores.bg}]}>
       <View style={styles.header}><TextInput style={[styles.headerTitle, {color: Cores.texto}]} value={appTitle} onChangeText={setAppTitle} onEndEditing={() => save(null, null, null, appTitle)} /></View>
@@ -323,11 +331,4 @@ const styles = StyleSheet.create({
   descansoCard: { padding: 20, borderRadius: 15, alignItems: 'center' },
   rowCentered: { flexDirection: 'row', alignItems: 'center' },
   stepAction: { fontSize: 35, paddingHorizontal: 25 },
-  stepVal: { fontSize: 26, fontWeight: 'bold' },
-  inputMenu: { padding: 15, borderRadius: 12, fontSize: 16 },
-  btnMenu: { padding: 18, borderRadius: 12, alignItems: 'center' },
-  timerOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.85)', justifyContent: 'center', alignItems: 'center' },
-  timerBox: { padding: 40, borderRadius: 25, alignItems: 'center', width: '80%' },
-  timerNum: { fontSize: 80, fontWeight: 'bold', marginBottom: 20 },
-  btnSkip: { padding: 15, borderRadius: 12, width: 120, alignItems: 'center' }
-});
+  stepVal: { fontSize: 26, fon
