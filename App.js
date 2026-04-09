@@ -327,4 +327,7 @@ const styles = StyleSheet.create({
   inputMenu: { padding: 15, borderRadius: 12, fontSize: 16 },
   btnMenu: { padding: 18, borderRadius: 12, alignItems: 'center' },
   timerOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.85)', justifyContent: 'center', alignItems: 'center' },
-  timerBox: { paddin
+  timerBox: { padding: 40, borderRadius: 25, alignItems: 'center', width: '80%' },
+  timerNum: { fontSize: 80, fontWeight: 'bold', marginBottom: 20 },
+  btnSkip: { padding: 15, borderRadius: 12, width: 120, alignItems: 'center' }
+});
