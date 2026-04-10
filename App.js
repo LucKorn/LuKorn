@@ -140,6 +140,7 @@ export default function App() {
 
     return (
       <SafeAreaView style={[styles.container, {backgroundColor: Cores.bg}]}>
+        <ManterTelaAcesa />
         <View style={styles.header}>
           <TouchableOpacity onPress={() => setTela('menu')}><Text style={[styles.backLink, {color: Cores.texto}]}>◀</Text></TouchableOpacity>
           <Text style={[styles.headerTitle, {color: Cores.texto}]}>HISTÓRICO</Text>
@@ -175,6 +176,7 @@ export default function App() {
     const lista = exercicios[treinoAtivo] || [];
     return (
       <SafeAreaView style={[styles.container, {backgroundColor: Cores.bg}]}>
+        <ManterTelaAcesa />
         <View style={styles.header}>
           <TouchableOpacity onPress={() => setTela('menu')}><Text style={[styles.backLink, {color: Cores.texto}]}>◀</Text></TouchableOpacity>
           <Text style={[styles.headerTitle, {color: Cores.texto, flex: 1, textAlign: 'center'}]}>{treinoAtivo}</Text>
@@ -226,18 +228,11 @@ export default function App() {
             );
           }} 
           ListFooterComponent={() => <TouchableOpacity style={[styles.btnFinalizar, {backgroundColor: Cores.destaque}]} onPress={() => {
-              // 1. Calcula volume e prepara histórico
               const v = exercicios[treinoAtivo].reduce((a, e) => a + (e.feitas * e.rep * e.carga), 0);
               const nH = [{ id: Date.now().toString(), treino: treinoAtivo, volume: v, dataStr: new Date().toLocaleDateString('pt-BR'), timestamp: Date.now() }, ...historico];
-              
-              // 2. Reseta as séries feitas deste treino
               const nE = {...exercicios, [treinoAtivo]: exercicios[treinoAtivo].map(e => ({...e, feitas: 0}))};
-              
-              // 3. LOGICA DE FILA: Move o treino atual para o final da lista
               const novaOrdem = ordemTreinos.filter(n => n !== treinoAtivo);
               novaOrdem.push(treinoAtivo);
-              
-              // 4. Atualiza estados e salva
               setOrdemTreinos(novaOrdem);
               setHistorico(nH); 
               setExercicios(nE); 
@@ -260,6 +255,7 @@ export default function App() {
 
   return (
     <SafeAreaView style={[styles.container, {backgroundColor: Cores.bg}]}>
+      <ManterTelaAcesa />
       <View style={styles.header}><TextInput style={[styles.headerTitle, {color: Cores.texto}]} value={appTitle} onChangeText={setAppTitle} onEndEditing={() => save(null, null, null, appTitle)} /></View>
       <ScrollView contentContainerStyle={{padding: 15}}>
         <TouchableOpacity style={[styles.btnHist, {borderColor: Cores.destaque, borderWidth: 1, marginBottom: 20}]} onPress={() => setTela('historico')}><Text style={{color: Cores.destaque, fontWeight: 'bold'}}>📜 VER HISTÓRICO MENSAL</Text></TouchableOpacity>
@@ -331,4 +327,11 @@ const styles = StyleSheet.create({
   descansoCard: { padding: 20, borderRadius: 15, alignItems: 'center' },
   rowCentered: { flexDirection: 'row', alignItems: 'center' },
   stepAction: { fontSize: 35, paddingHorizontal: 25 },
-  stepVal: { fontSize: 26, fon
+  stepVal: { fontSize: 26, fontWeight: 'bold' },
+  inputMenu: { padding: 15, borderRadius: 12, fontSize: 16 },
+  btnMenu: { padding: 18, borderRadius: 12, alignItems: 'center' },
+  timerOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.8)', justifyContent: 'center', alignItems: 'center' },
+  timerBox: { width: 250, padding: 30, borderRadius: 20, alignItems: 'center' },
+  timerNum: { fontSize: 60, fontWeight: 'bold', marginVertical: 20 },
+  btnSkip: { paddingHorizontal: 30, paddingVertical: 10, borderRadius: 10 }
+});
