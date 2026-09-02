@@ -17,6 +17,9 @@
     "expo-splash-screen": "~0.26.4",
     "expo-keep-awake": "~12.8.2",
     "babel-preset-expo": "~10.0.1"
+    "react-native-gifted-charts": "^1.4.10",
+  "react-native-svg": "^14.1.0",
+    
   },
   "devDependencies": {
     "@babel/core": "^7.20.0"
